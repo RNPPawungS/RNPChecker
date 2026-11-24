@@ -1,0 +1,228 @@
+<%- include('_head') %>
+<h1>Checker</h1>
+<div class="tabs">
+  <a href="/checker?tab=ref" class="<%= tab==='ref'?'on':'' %>">1. Ref Check</a>
+  <a href="/checker?tab=cross" class="<%= tab==='cross'?'on':'' %>">2. Cross Ref Check</a>
+  <label class="sound"><input type="checkbox" id="snd" checked> เสียงแจ้งผล</label>
+</div>
+
+<% if (tab==='ref') { %>
+<div class="card">
+  <p class="muted">ยิงหรือพิมพ์เลข แล้วกด Enter · ใส่ Waybill No. จะได้ Box No. · ใส่ Box No. จะได้รายการ Waybill No. ในกล่อง</p>
+  <form id="refForm" class="row" autocomplete="off">
+    <input id="refQ" class="scan" placeholder="Waybill No. หรือ Box No." autofocus>
+    <select id="refType"><option value="auto">ตรวจอัตโนมัติ</option><option value="waybill">เป็น Waybill No.</option><option value="box">เป็น Box No.</option></select>
+    <button class="btn">ค้นหา</button>
+  </form>
+</div>
+<div id="refOut" class="rout"></div>
+<div id="refList"></div>
+<% } else { %>
+<div class="card">
+  <div class="row">
+    <b>ลำดับการกรอก:</b>
+    <label class="radio"><input type="radio" name="order" value="wb" checked> Waybill No. → Box No.</label>
+    <label class="radio"><input type="radio" name="order" value="bw"> Box No. → Waybill No.</label>
+  </div>
+  <form id="crossForm" class="cross" autocomplete="off">
+    <label><span id="l1">1. Waybill No.</span><input id="c1" class="scan" autofocus></label>
+    <span class="arrow">→</span>
+    <label><span id="l2">2. Box No.</span><input id="c2" class="scan"></label>
+    <button class="btn">ตรวจ</button>
+    <button type="button" class="btn ghost" id="cReset">ล้าง</button>
+  </form>
+</div>
+<div id="crossOut" class="rout"></div>
+<div class="stats3">
+  <div class="card stat s-inserted"><span>ตรง (วันนี้)</span><b id="nOk">0</b></div>
+  <div class="card stat s-error"><span>ไม่ตรง</span><b id="nBad">0</b></div>
+  <div class="card stat s-unchanged"><span>ไม่พบในระบบ</span><b id="nNf">0</b></div>
+</div>
+<% } %>
+
+<div class="card table">
+  <div class="tbar"><h3 style="margin:0">ประวัติการตรวจวันนี้</h3>
+    <label class="sm"><input type="checkbox" id="allUsers"> แสดงของทุกคน</label></div>
+  <div class="scroll"><table><thead><tr><th>เวลา</th><th>ผู้ตรวจ</th><th>ประเภท</th><th>เลขที่กรอก</th><th>ผล</th><th>รายละเอียด</th></tr></thead><tbody id="logs"></tbody></table></div>
+</div>
+
+<script>
+(function () {
+  var TAB = '<%= tab %>';
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); };
+  var store = {
+    get: function (k, d) { try { var v = localStorage.getItem('ck_' + k); return v == null ? d : v; } catch (e) { return d; } },
+    set: function (k, v) { try { localStorage.setItem('ck_' + k, v); } catch (e) {} },
+  };
+  $('snd').checked = store.get('sound', '1') === '1';
+  $('snd').addEventListener('change', function () { store.set('sound', this.checked ? '1' : '0'); });
+  $('allUsers').checked = store.get('all', '0') === '1';
+  $('allUsers').addEventListener('change', function () { store.set('all', this.checked ? '1' : '0'); });
+  var ac;
+  function beep(ok) {
+    if (!$('snd').checked) return;
+    try {
+      ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      var tones = ok ? [[880, 0, .12]] : [[220, 0, .18], [220, .25, .18]];
+      tones.forEach(function (t) {
+        var o = ac.createOscillator(), g = ac.createGain();
+        o.type = ok ? 'sine' : 'square'; o.frequency.value = t[0]; g.gain.value = .15;
+        o.connect(g); g.connect(ac.destination);
+        o.start(ac.currentTime + t[1]); o.stop(ac.currentTime + t[1] + t[2]);
+      });
+    } catch (e) {}
+  }
+  // ---- big result panel ----
+  var ICON = {
+    ok: '<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="#fff"/><path d="M18 33l10 10 18-20" fill="none" stroke="#16a34a" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    bad: '<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="#fff"/><path d="M21 21l22 22M43 21L21 43" stroke="#dc2626" stroke-width="7" stroke-linecap="round"/></svg>',
+    nf: '<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="#fff"/><text x="32" y="45" text-anchor="middle" font-size="38" font-weight="700" fill="#b45309" font-family="sans-serif">?</text></svg>',
+    wait: '<svg viewBox="0 0 64 64" class="spin"><circle cx="32" cy="32" r="26" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="7"/><path d="M32 6a26 26 0 0 1 26 26" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/></svg>',
+  };
+  var scanNo = Number(store.get('scanNo', '0')) || 0, staleTimer, agoTimer;
+  function hhmmss(d) { return d.toLocaleTimeString('en-GB', { hour12: false }); }
+  function panel(out, o) {
+    clearTimeout(staleTimer); clearInterval(agoTimer);
+    if (o.cls === 'wait') { scanNo++; store.set('scanNo', String(scanNo)); }
+    var at = new Date();
+    var h = '<div class="rpanel ' + o.cls + ' fresh">' +
+      '<div class="ricon">' + ICON[o.cls] + '</div><div class="rbody">' +
+      '<div class="rhead"><span class="rnum">ครั้งที่ #' + scanNo + '</span><span class="rtime">' + hhmmss(at) + ' · <span class="ago">เมื่อสักครู่</span></span><span class="rnew">● ผลล่าสุด</span></div>' +
+      '<div class="rtitle">' + esc(o.title) + '</div>' +
+      (o.pairs ? '<div class="rpairs">' + o.pairs.map(function (p) { return '<div class="' + (p[2] || '') + '"><span>' + esc(p[0]) + '</span><b>' + esc(p[1]) + '</b></div>'; }).join('') + '</div>' : '') +
+      (o.msg ? '<div class="rmsg">' + esc(o.msg) + '</div>' : '') + '</div></div>';
+    var keepPrev = (out.querySelector('.rprev') || {}).innerHTML || '';
+    out.innerHTML = h + (keepPrev ? '<div class="rprev">' + keepPrev + '</div>' : '');
+    alertFrame(o.cls);
+    if (o.cls === 'wait') return;
+    out.setAttribute('data-last', o.summary || '');
+    var el = out.querySelector('.rpanel');
+    agoTimer = setInterval(function () {
+      var sec = Math.round((Date.now() - at) / 1000);
+      el.querySelector('.ago').textContent = sec < 5 ? 'เมื่อสักครู่' : sec < 60 ? sec + ' วินาทีที่แล้ว' : Math.floor(sec / 60) + ' นาทีที่แล้ว';
+    }, 1000);
+    staleTimer = setTimeout(function () { el.classList.remove('fresh'); el.classList.add('stale'); el.querySelector('.rnew').textContent = 'ผลก่อนหน้า · ยิงเลขใหม่เพื่อตรวจ'; }, 10000);
+  }
+  // coloured frame around the whole screen: flashes on each result, keeps pulsing on mismatch / not found until the next scan
+  function alertFrame(cls) {
+    var f = document.getElementById('alertFrame');
+    if (!f) { f = document.createElement('div'); f.id = 'alertFrame'; document.body.appendChild(f); }
+    f.className = '';
+    if (cls === 'wait') return;
+    void f.offsetWidth;
+    f.className = cls + (cls === 'ok' ? ' once' : ' hold');
+  }
+  function prevText(out) {
+    var last = out.getAttribute('data-last');
+    return last ? '<span class="muted">ก่อนหน้า:</span> ' + esc(last) : '';
+  }
+  function startWait(out, pairs) {
+    var pt = prevText(out);
+    panel(out, { cls: 'wait', title: 'กำลังตรวจ...', pairs: pairs });
+    var pv = out.querySelector('.rprev');
+    if (pt) { if (pv) pv.innerHTML = pt; else out.insertAdjacentHTML('beforeend', '<div class="rprev">' + pt + '</div>'); }
+  }
+  function strip(v) { return String(v || '').replace(/\*/g, '').trim(); }
+  function post(url, body) {
+    return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), credentials: 'same-origin' })
+      .then(function (r) { return r.json(); });
+  }
+  var RES = { found: ['พบ', 't-inserted'], match: ['ตรง', 't-inserted'], mismatch: ['ไม่ตรง', 't-error'], not_found: ['ไม่พบ', 't-unchanged'] };
+  function loadLogs() {
+    fetch('/api/checker/logs' + ($('allUsers').checked ? '?all=1' : ''), { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (d) {
+      $('logs').innerHTML = d.rows.map(function (r) {
+        var res = RES[r.result] || [r.result, ''];
+        var type = r.mode === 'ref' ? 'Ref Check' : 'Cross (' + (r.check_order === 'bw' ? 'Box→Waybill' : 'Waybill→Box') + ')';
+        return '<tr><td class="nowrap">' + esc(r.created_at.split(' ')[1] || r.created_at) + '</td><td class="sm">' + esc(r.email) + '</td><td class="sm">' + type +
+          '</td><td class="mono">' + esc(r.input1) + (r.input2 ? ' → ' + esc(r.input2) : '') + '</td><td><span class="tag ' + res[1] + '">' + res[0] + '</span></td><td class="sm">' + esc(r.detail) + '</td></tr>';
+      }).join('') || '<tr><td colspan="6" class="muted center">ยังไม่มีการตรวจวันนี้</td></tr>';
+      if ($('nOk')) { $('nOk').textContent = d.summary.match; $('nBad').textContent = d.summary.mismatch; $('nNf').textContent = d.summary.not_found; }
+    });
+  }
+  $('allUsers').addEventListener('change', loadLogs);
+
+  if (TAB === 'ref') {
+    $('refType').value = store.get('refType', 'auto');
+    $('refType').addEventListener('change', function () { store.set('refType', this.value); $('refQ').focus(); });
+    $('refForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var q = strip($('refQ').value); if (!q) { $('refQ').value = ''; return; }
+      $('refQ').value = ''; $('refQ').focus();
+      var out = $('refOut'), list = $('refList');
+      startWait(out, [['เลขที่ยิง', q, 'hl']]); list.innerHTML = '';
+      post('/api/checker/ref', { q: q, type: $('refType').value }).then(function (d) {
+        if (d.error) { panel(out, { cls: 'bad', title: d.error, summary: q + ' ✖' }); beep(false); return; }
+        if (d.result === 'not_found') {
+          panel(out, { cls: 'nf', title: 'ไม่พบ', pairs: [['เลขที่ยิง', q, 'hl']], msg: d.message, summary: q + ' → ไม่พบ' }); beep(false);
+        } else if (d.kind === 'waybill') {
+          panel(out, { cls: 'ok', title: 'Box No. ' + d.box_no, pairs: [['Waybill No. (ที่ยิง)', d.waybill_no, 'hl'], ['Box No.', d.box_no, 'big'], ['Operation Date', d.operation_date], ['ในกล่องนี้', d.box_count + ' รายการ']],
+            summary: d.waybill_no + ' → Box ' + d.box_no }); beep(true);
+        } else {
+          panel(out, { cls: 'ok', title: d.count + ' Waybill', pairs: [['Box No. (ที่ยิง)', d.box_no, 'hl'], ['จำนวน Waybill', d.count + ' รายการ', 'big'], ['Operation Date', d.dates.join(', ')]],
+            summary: 'Box ' + d.box_no + ' → ' + d.count + ' Waybill' });
+          list.innerHTML = '<div class="card table"><div class="scroll"><table><thead><tr><th class="num">#</th><th>Waybill No. ในกล่อง ' + esc(d.box_no) + '</th><th>Operation Date</th></tr></thead><tbody>' +
+            d.waybills.map(function (w, i) { return '<tr><td class="num muted">' + (i + 1) + '</td><td class="mono">' + esc(w.waybill_no) + '</td><td>' + esc(w.operation_date) + '</td></tr>'; }).join('') +
+            '</tbody></table></div></div>'; beep(true);
+        }
+        loadLogs();
+      }).catch(function () { panel(out, { cls: 'bad', title: 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้', msg: 'ลองยิงใหม่อีกครั้ง' }); beep(false); });
+    });
+  } else {
+    var c1 = $('c1'), c2 = $('c2'), seq = 0;
+    var saved = store.get('order', 'wb');
+    document.querySelector('input[name=order][value=' + (saved === 'bw' ? 'bw' : 'wb') + ']').checked = true;
+    function order() { return document.querySelector('input[name=order]:checked').value; }
+    function labels() {
+      var wb = order() === 'wb';
+      $('l1').textContent = '1. ' + (wb ? 'Waybill No.' : 'Box No.'); $('l2').textContent = '2. ' + (wb ? 'Box No.' : 'Waybill No.');
+      c1.placeholder = 'ยิง ' + (wb ? 'Waybill No.' : 'Box No.'); c2.placeholder = 'ยิง ' + (wb ? 'Box No.' : 'Waybill No.');
+    }
+    document.querySelectorAll('input[name=order]').forEach(function (r) {
+      r.addEventListener('change', function () { store.set('order', order()); labels(); c1.value = ''; c2.value = ''; c1.focus(); });
+    });
+    labels();
+    // Enter in field 1 -> jump to field 2; Enter in field 2 -> check, then back to field 1 for the next pair
+    c1.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      if (strip(c1.value)) { c2.focus(); c2.select(); } else c1.value = '';
+    });
+    c2.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      if (!strip(c2.value)) { c2.value = ''; return; }
+      if (!strip(c1.value)) { c1.value = ''; c1.focus(); return; }
+      check();
+    });
+    $('cReset').addEventListener('click', function () { c1.value = ''; c2.value = ''; c1.focus(); $('crossOut').innerHTML = ''; $('crossOut').removeAttribute('data-last'); });
+    $('crossForm').addEventListener('submit', function (e) { e.preventDefault(); if (!c1.value.trim()) return c1.focus(); if (!c2.value.trim()) return c2.focus(); check(); });
+    function check() {
+      var first = c1.value, second = c2.value, my = ++seq;
+      // clear right away so the next scan can start while the result is loading
+      c2.value = '';
+      c1.value = ''; c1.focus();
+      var out = $('crossOut'), wbFirst = order() === 'wb';
+      var lbl1 = wbFirst ? 'Waybill No.' : 'Box No.', lbl2 = wbFirst ? 'Box No.' : 'Waybill No.';
+      startWait(out, [[lbl1, strip(first), 'hl'], [lbl2, strip(second), 'hl']]);
+      post('/api/checker/cross', { order: order(), first: first, second: second }).then(function (d) {
+        if (my !== seq) return;
+        if (d.error) { panel(out, { cls: 'bad', title: d.error }); beep(false); return; }
+        var pairs = wbFirst ? [['Waybill No. (ที่ยิง)', d.waybill_no, 'hl big'], ['Box No. (ที่ยิง)', d.box_no, 'hl big']] : [['Box No. (ที่ยิง)', d.box_no, 'hl big'], ['Waybill No. (ที่ยิง)', d.waybill_no, 'hl big']];
+        if (d.result === 'mismatch') pairs.push(['กล่องที่ถูกต้อง', d.expected_box, 'big']);
+        if (d.operation_date) pairs.push(['Operation Date', d.operation_date]);
+        var title = d.result === 'match' ? 'ตรง ถูกต้อง' : d.result === 'mismatch' ? 'ไม่ตรง!' : 'ไม่พบในระบบ';
+        panel(out, { cls: d.result === 'match' ? 'ok' : d.result === 'mismatch' ? 'bad' : 'nf', title: title, pairs: pairs,
+          msg: d.message, summary: d.waybill_no + ' / ' + d.box_no + ' → ' + title });
+        beep(d.result === 'match'); loadLogs();
+      }).catch(function () { if (my === seq) { panel(out, { cls: 'bad', title: 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้', msg: 'ลองยิงใหม่อีกครั้ง' }); beep(false); } });
+    }
+    // keep the cursor in a scan field if the page is clicked elsewhere
+    document.addEventListener('click', function (e) {
+      if (!e.target.closest('input,select,button,a,label')) ((c1.value && !c2.value) ? c2 : c1).focus();
+    });
+  }
+  loadLogs();
+})();
+</script>
+<%- include('_foot') %>

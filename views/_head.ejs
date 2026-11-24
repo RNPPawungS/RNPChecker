@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Packing · RNP Express</title>
+<link rel="stylesheet" href="/vendor/flatpickr/flatpickr.min.css">
+<link rel="stylesheet" href="/static/style.css">
+<script src="/vendor/flatpickr/flatpickr.min.js"></script></head><body>
+<% if (user && user.status === 'active') { %>
+<header class="top"><div class="wrap bar">
+  <a class="brand" href="/">📦 Packing</a>
+  <nav>
+    <a href="/" class="<%= path==='/'?'on':'' %>">หน้าหลัก</a>
+    <a href="/data" class="<%= path.startsWith('/data')?'on':'' %>">จัดการข้อมูล</a>
+    <a href="/checker" class="<%= path.startsWith('/checker')?'on':'' %>">Checker</a>
+    <a href="/upload" class="<%= path.startsWith('/upload')?'on':'' %>">อัปโหลด</a>
+    <% if (user.role==='admin') { %><a href="/users" class="<%= path.startsWith('/users')?'on':'' %>">ผู้ใช้งาน</a><% } %>
+  </nav>
+  <form method="post" action="/logout" class="me"><span><%= user.email %></span><button class="btn ghost sm">ออกจากระบบ</button></form>
+</div></header>
+<% } %>
+<main class="wrap">
+<% if (flash) { %><div class="flash <%= flash.type %>"><%= flash.msg %></div><% } %>

@@ -1,0 +1,60 @@
+<%- include('_head') %>
+<p><a href="/upload">‹ กลับไปหน้าอัปโหลด</a></p>
+<h1>ผลการ import #<%= up.id %></h1>
+<div class="card">
+  <div class="meta">
+    <div><span>ไฟล์</span><b><%= up.filename %></b></div>
+    <div><span>ผู้อัปโหลด</span><b><%= up.email %></b></div>
+    <div><span>เวลา</span><b><%= dmy(up.created_at) %></b></div>
+    <div><span>ขนาดไฟล์</span><b><%= up.file_size ? (up.file_size/1024).toFixed(1) + ' KB' : '-' %></b></div>
+    <div><span>ใช้เวลา</span><b><%= up.duration_ms != null ? (up.duration_ms/1000).toFixed(2) + ' วินาที' : '-' %></b></div>
+    <div><span>สถานะ</span><b>
+      <% if (up.status==='failed') { %><span class="tag disabled">ล้มเหลว</span><% } else if (up.status==='processing') { %><span class="tag pending">กำลังประมวลผล</span><% } else if (up.error_rows>0) { %><span class="tag pending">สำเร็จบางส่วน</span><% } else { %><span class="tag active">สำเร็จทั้งหมด</span><% } %>
+    </b></div>
+  </div>
+  <% if (up.message) { %><div class="flash error" style="margin:12px 0 0"><%= up.message %></div><% } %>
+</div>
+<% if (up.status !== 'failed') { const all = up.total_rows || 0; const pct = (n) => all ? Math.round(n / all * 100) : 0; %>
+<div class="stats5">
+  <a class="card stat <%= !q.status ? 'sel' : '' %>" href="?"><span>ทั้งหมด</span><b><%= all.toLocaleString() %></b><i>แถว</i></a>
+  <a class="card stat s-inserted <%= q.status==='inserted' ? 'sel' : '' %>" href="?status=inserted"><span>เพิ่มใหม่</span><b><%= (c.inserted||0).toLocaleString() %></b><i><%= pct(c.inserted||0) %>%</i></a>
+  <a class="card stat s-updated <%= q.status==='updated' ? 'sel' : '' %>" href="?status=updated"><span>อัปเดต</span><b><%= (c.updated||0).toLocaleString() %></b><i><%= pct(c.updated||0) %>%</i></a>
+  <a class="card stat s-unchanged <%= q.status==='unchanged' ? 'sel' : '' %>" href="?status=unchanged"><span>ไม่เปลี่ยนแปลง</span><b><%= (c.unchanged||0).toLocaleString() %></b><i><%= pct(c.unchanged||0) %>%</i></a>
+  <a class="card stat s-error <%= q.status==='error' ? 'sel' : '' %>" href="?status=error"><span>ผิดพลาด</span><b><%= (c.error||0).toLocaleString() %></b><i><%= pct(c.error||0) %>%</i></a>
+</div>
+<div class="card">
+  <div class="stackbar">
+    <% ['inserted','updated','unchanged','error'].forEach(s => { if (c[s]) { %><span class="s-<%= s %>" style="width:<%= c[s]/all*100 %>%" title="<%= STATUS[s] %> <%= c[s] %>"></span><% } }) %>
+  </div>
+  <% if (errors.length) { %>
+  <h3 style="margin-top:16px">สาเหตุที่ผิดพลาด</h3>
+  <table class="compact"><tbody>
+  <% errors.forEach(e => { %><tr><td class="err"><%= e.message %></td><td class="num"><%= e.n %> แถว</td></tr><% }) %>
+  </tbody></table>
+  <% } %>
+</div>
+<div class="card table">
+  <form class="filters" method="get">
+    <% if (q.status) { %><input type="hidden" name="status" value="<%= q.status %>"><% } %>
+    <input name="q" placeholder="ค้นหา Box No. / Waybill No." value="<%= q.q||'' %>">
+    <button class="btn">ค้นหา</button>
+    <a class="btn ghost" href="/upload/<%= up.id %>/export?<%= new URLSearchParams({status:q.status||'',q:q.q||''}) %>">⬇️ ดาวน์โหลดผลเป็น Excel</a>
+  </form>
+  <p class="muted sm">แสดง <%= total.toLocaleString() %> แถว<%= q.status ? ' (' + STATUS[q.status] + ')' : '' %> · แถวที่ผิดพลาดแสดงก่อน</p>
+  <div class="scroll"><table>
+  <thead><tr><th class="num">แถว</th><th>Box No.</th><th>Waybill No.</th><th>Operation Date</th><th>สถานะ</th><th>รายละเอียด</th></tr></thead><tbody>
+  <% rows.forEach(r => { %><tr class="r-<%= r.status %>">
+    <td class="num muted"><%= r.line_no %></td>
+    <td><%= r.box_no %></td><td class="mono"><%= r.waybill_no %></td>
+    <td><%= r.operation_date ? dmy(r.operation_date) : r.raw_date %></td>
+    <td><span class="tag t-<%= r.status %>"><%= STATUS[r.status] %></span></td>
+    <td class="sm"><%= r.message || '' %></td>
+  </tr><% }) %>
+  <% if (!rows.length) { %><tr><td colspan="6" class="muted center">ไม่มีรายการ</td></tr><% } %>
+  </tbody></table></div>
+  <% if (pages>1) { const p = (n)=>'?'+new URLSearchParams({...q,page:n}); %>
+  <div class="pager"><% if (page>1) { %><a href="<%= p(page-1) %>">‹ ก่อนหน้า</a><% } %><span>หน้า <%= page %> / <%= pages %></span><% if (page<pages) { %><a href="<%= p(page+1) %>">ถัดไป ›</a><% } %></div>
+  <% } %>
+</div>
+<% } %>
+<%- include('_foot') %>

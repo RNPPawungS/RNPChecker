@@ -1,0 +1,17 @@
+[Unit]
+Description=Packing web app
+After=network.target mysql.service
+
+[Service]
+Type=simple
+User=packing
+WorkingDirectory=/opt/packing
+EnvironmentFile=/opt/packing/.env
+ExecStart=/usr/bin/node src/app.js
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,15 @@
+<%- include('_head') %>
+<h1>สวัสดี <%= user.name || user.email %></h1>
+<div class="stats">
+  <div class="card stat"><span>จำนวนพัสดุทั้งหมด</span><b><%= Number(s.total).toLocaleString() %></b></div>
+  <div class="card stat"><span>จำนวนกล่อง</span><b><%= Number(s.boxes).toLocaleString() %></b></div>
+  <div class="card stat"><span>รอบเอกสารวันนี้</span><b><%= Number(s.today||0).toLocaleString() %></b></div>
+  <div class="card stat"><span>รอบเอกสารล่าสุด</span><b><%= dmy(s.last_date) || '-' %></b></div>
+</div>
+<div class="menu">
+  <a class="card tile" href="/data"><b>🗂️ จัดการข้อมูล</b><span>ดู ค้นหา แก้ไข ลบ Box No. / Waybill No. / Operation Date</span></a>
+  <a class="card tile" href="/checker"><b>🔍 Checker</b><span>Ref Check หาเลขอ้างอิง และ Cross Ref Check ตรวจคู่ Waybill / Box</span></a>
+  <a class="card tile" href="/upload"><b>⬆️ อัปโหลดเอกสาร</b><span>ดาวน์โหลด template และอัปโหลดไฟล์ Excel / CSV</span></a>
+  <% if (user.role==='admin') { %><a class="card tile" href="/users"><b>👥 ผู้ใช้งาน</b><span>อนุมัติและกำหนดสิทธิ์ผู้ใช้</span></a><% } %>
+</div>
+<%- include('_foot') %>

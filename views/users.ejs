@@ -1,0 +1,17 @@
+<%- include('_head') %>
+<h1>ผู้ใช้งาน</h1>
+<div class="card table"><div class="scroll"><table>
+<thead><tr><th>อีเมล</th><th>ชื่อ</th><th>สิทธิ์</th><th>สถานะ</th><th>เข้าใช้ล่าสุด</th><th></th></tr></thead><tbody>
+<% users.forEach(u => { %>
+<tr><td><%= u.email %></td><td><%= u.name %></td>
+<td><%= u.role==='admin'?'ผู้ดูแล':'ผู้ใช้' %></td>
+<td><span class="tag <%= u.status %>"><%= {pending:'รออนุมัติ',active:'ใช้งาน',disabled:'ระงับ'}[u.status] %></span></td>
+<td class="sm muted"><%= dmy(u.last_login_at) %></td>
+<td class="row"><% if (u.id !== user.id) { %>
+  <form method="post" action="/users/<%= u.id %>">
+  <% if (u.status!=='active') { %><button name="status" value="active" class="btn sm">อนุมัติ</button><% } else { %><button name="status" value="disabled" class="btn danger sm">ระงับ</button><% } %>
+  <button name="role" value="<%= u.role==='admin'?'user':'admin' %>" class="btn ghost sm"><%= u.role==='admin'?'ถอดผู้ดูแล':'ตั้งเป็นผู้ดูแล' %></button>
+  </form><% } %></td></tr>
+<% }) %>
+</tbody></table></div></div>
+<%- include('_foot') %>

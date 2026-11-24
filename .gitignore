@@ -1,0 +1,13 @@
+node_modules/
+.env
+.env.*
+!.env.example
+*.log
+*.tgz
+*.sql.gz
+packing-backup-*/
+uploads/
+*.pem
+*.key
+*.crt
+.DS_Store
