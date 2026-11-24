@@ -2,7 +2,7 @@
 # อัปเดตโค้ด packing บนเซิร์ฟเวอร์ (รันเป็น root) จากโฟลเดอร์ที่แตกไฟล์ bundle ไว้
 # ไม่แตะ .env, network หรือ SSH. สำรองโค้ดเดิมไว้ที่ /root/packing-backup-<เวลา>
 set -euo pipefail
-SRC="$(cd "$(dirname "$0")/.." && pwd)"
+SRC="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
 APP=/opt/packing
 TS=$(date +%Y%m%d-%H%M%S)
 BK=/root/packing-backup-$TS

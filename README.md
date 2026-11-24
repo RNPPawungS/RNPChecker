@@ -24,8 +24,9 @@ deploy/     install.sh (ติดตั้งครั้งแรก), update.s
 
 ## ติดตั้งครั้งแรก (Ubuntu 24.04, รันเป็น root)
 ```bash
-git clone https://github.com/RNPPawungS/RNPChecker.git /root/packing
-bash /root/packing/deploy/install.sh
+git clone https://github.com/RNPPawungS/RNPChecker.git /opt/packing-src
+bash /opt/packing-src/deploy/install.sh
+ln -sf /opt/packing-src/deploy/pull-update.sh /usr/local/bin/packing-update
 nano /opt/packing/.env          # ใส่ GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET
 systemctl restart packing
 ```
@@ -33,12 +34,22 @@ systemctl restart packing
 
 Google OAuth redirect URI: `https://packing.rnpexpress.co.th/auth/google/callback`
 
-## อัปเดตเวอร์ชัน
+## อัปเดตเวอร์ชันจาก GitHub
+บนเซิร์ฟเวอร์มีโค้ดจาก repo นี้อยู่ที่ `/opt/packing-src` (git clone) ส่วนเว็บที่รันจริงอยู่ที่ `/opt/packing`
 ```bash
-cd /root/packing && git pull
-bash deploy/update.sh
+packing-update --check   # ดูว่ามี commit ใหม่บน GitHub หรือไม่ (ยังไม่อัปเดต)
+packing-update           # ดึงโค้ดล่าสุดจาก branch main แล้วอัปเดตเว็บ
 ```
-`update.sh` จะสำรองโค้ดและ mysqldump ไว้ที่ `/root/packing-backup-<เวลา>` คัดลอกโค้ดใหม่ (ไม่แตะ `.env`) รัน migration ที่ยังไม่ได้ลง แล้วรีสตาร์ท
+`packing-update` (= `deploy/pull-update.sh`) จะ `git pull` แล้วเรียก `deploy/update.sh` ซึ่งสำรองโค้ดและ mysqldump ไว้ที่ `/root/packing-backup-<เวลา>` คัดลอกโค้ดใหม่ (ไม่แตะ `.env`) รัน migration ที่ยังไม่ได้ลง แล้วรีสตาร์ท และบันทึก commit ที่ลงไว้ใน `/opt/packing/REVISION`
+
+ตั้งค่าครั้งแรกบนเซิร์ฟเวอร์ที่ติดตั้งไว้แล้ว:
+```bash
+apt-get install -y git
+git clone https://github.com/RNPPawungS/RNPChecker.git /opt/packing-src
+ln -sf /opt/packing-src/deploy/pull-update.sh /usr/local/bin/packing-update
+packing-update
+```
+ถ้าภายหลังเปลี่ยน repo เป็น private ต้องเพิ่ม deploy key (read-only) ให้เซิร์ฟเวอร์ แล้วเปลี่ยน remote เป็น `git@github.com:RNPPawungS/RNPChecker.git`
 
 ## ตั้งค่า (`.env`)
 ดู `.env.example` ห้าม commit ไฟล์ `.env` จริงขึ้น repo
