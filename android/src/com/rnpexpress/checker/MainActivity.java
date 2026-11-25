@@ -407,7 +407,7 @@ public class MainActivity extends Activity {
             b.setOnClickListener(new View.OnClickListener() {
                 @Override public void onClick(View v) {
                     prefs.edit().putString("refType", t[0]).apply();
-                    for (int i = 0; i < row.getChildCount(); i++) styleChip((Button) row.getChildAt(i), types[i][0].equals(t[0]));
+                    for (int i = 0; i < types.length; i++) styleChip((Button) row.getChildAt(i), types[i][0].equals(t[0]));
                     refocus();
                 }
             });
@@ -431,7 +431,7 @@ public class MainActivity extends Activity {
             b.setOnClickListener(new View.OnClickListener() {
                 @Override public void onClick(View v) {
                     prefs.edit().putString("order", o[0]).apply();
-                    for (int i = 0; i < row.getChildCount(); i++) styleChip((Button) row.getChildAt(i), orders[i][0].equals(o[0]));
+                    for (int i = 0; i < orders.length; i++) styleChip((Button) row.getChildAt(i), orders[i][0].equals(o[0])); // row also holds the clear button
                     crossLabels();
                     c1.setText(""); c2.setText("");
                     c1.requestFocus();
@@ -878,7 +878,7 @@ public class MainActivity extends Activity {
         server.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
         server.setText(api.server());
         box.addView(server);
-        TextView hint = text("ค่าเริ่มต้น " + BuildInfo.DEFAULT_SERVER + " (ใช้ https://10.80.0.9 ได้ถ้าเครื่องหาชื่อโดเมนไม่เจอ)", 12, MUTED, false);
+        TextView hint = text("ค่าเริ่มต้น " + BuildInfo.DEFAULT_SERVER, 12, MUTED, false);
         box.addView(hint);
         final CheckBox sound = check("เสียงแจ้งผล", prefs.getBoolean("sound", true));
         final CheckBox vib = check("สั่นแจ้งผล", prefs.getBoolean("vibrate", true));
