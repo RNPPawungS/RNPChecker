@@ -1,0 +1,33 @@
+<%- include('_head') %>
+<h1>📱 เชื่อมแอป Android (Checker)</h1>
+<div class="grid2">
+  <div class="card center">
+    <h3 style="margin-top:0">1. เข้าสู่ระบบในแอป</h3>
+    <p>เปิดแอป <b>RNP Checker</b> บนเครื่อง handheld แล้ว<b>ยิงบาร์โค้ด QR นี้</b><br>แอปจะเข้าสู่ระบบเป็น <b><%= user.email %></b></p>
+    <div class="qr"><%- qr %></div>
+    <p class="muted sm">QR ใช้ได้ <span id="left"><%= ttlMin %>:00</span> นาที · <a href="/app/pair">สร้าง QR ใหม่</a></p>
+    <details class="sm"><summary>แสดงรหัส (กรณีพิมพ์เอง)</summary><p class="mono" style="word-break:break-all"><%= code %></p></details>
+  </div>
+  <div class="card center">
+    <h3 style="margin-top:0">2. ติดตั้งแอป</h3>
+    <% if (hasApk) { %>
+      <p>สแกน QR นี้ด้วยกล้อง/เบราว์เซอร์ของเครื่อง หรือเปิดลิงก์</p>
+      <div class="qr"><%- dlQr %></div>
+      <p><a class="btn" href="/app/download">⬇️ ดาวน์โหลด rnp-checker.apk</a></p>
+    <% } else { %>
+      <p class="muted">ยังไม่มีไฟล์ APK บนเซิร์ฟเวอร์ (วางไฟล์ไว้ที่ public/app/rnp-checker.apk)</p>
+    <% } %>
+    <p class="muted sm">ตอนติดตั้งให้อนุญาต "ติดตั้งแอปที่ไม่รู้จัก" ให้กับเบราว์เซอร์ / ตัวจัดการไฟล์</p>
+  </div>
+</div>
+<script>
+(function () {
+  var end = Date.now() + <%= ttlMin %> * 60000, el = document.getElementById('left');
+  var t = setInterval(function () {
+    var s = Math.max(0, Math.round((end - Date.now()) / 1000));
+    el.textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+    if (!s) { clearInterval(t); location.reload(); }
+  }, 1000);
+})();
+</script>
+<%- include('_foot') %>
