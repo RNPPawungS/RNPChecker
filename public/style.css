@@ -148,6 +148,14 @@ table.compact td{padding:7px 10px}
 .pager{display:flex;gap:8px;justify-content:center;align-items:center;padding:14px;border-top:1px solid var(--line2)}
 .pager a{padding:6px 12px;border:1px solid var(--line);border-radius:8px;color:var(--ink2);font-weight:500;text-decoration:none!important}.pager a:hover{border-color:var(--pri);color:var(--pri)}
 .pager span{color:var(--muted);font-size:14px;padding:0 8px}
+.pager.pof{justify-content:space-between;flex-wrap:wrap;gap:10px 16px;padding:12px 18px}
+.pof .range{padding:0}
+.pof .pnav{display:flex;align-items:center;gap:6px}
+.pof .pbtn{display:grid;place-items:center;min-width:34px;height:34px;padding:0 8px;font-size:18px;line-height:1}
+.pof .pbtn.off{border:1px solid var(--line2);border-radius:8px;opacity:.45;color:var(--muted)}
+.pof .pnum{display:flex;align-items:center;gap:8px;margin:0 6px;padding:0;color:var(--muted);font-size:14px;white-space:nowrap}
+.pof .pnum input{width:60px;height:34px;padding:4px 6px;text-align:center;font-weight:600;-moz-appearance:textfield;appearance:textfield}
+.pof .pnum input::-webkit-inner-spin-button,.pof .pnum input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 
 /* ---------- home ---------- */
 .hello{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;background:linear-gradient(120deg,#1e1b2e 0%,#3b0d12 55%,var(--pri) 120%);color:#fff;border-radius:18px;padding:26px 28px;margin-bottom:20px;box-shadow:var(--sh-lg);position:relative;overflow:hidden}

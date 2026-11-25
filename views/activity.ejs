@@ -31,8 +31,18 @@
 <% }) %>
 <% if (!rows.length) { %><tr><td colspan="4" class="muted center"><%= t('ไม่พบข้อมูล') %></td></tr><% } %>
 </tbody></table></div>
-<% if (pages>1) { %>
-<div class="pager"><% if (page>1) { %><a href="<%= pageUrl(page-1) %>"><%= t('‹ ก่อนหน้า') %></a><% } %><span><%= t('หน้า {page} / {pages}', { page, pages }) %></span><% if (page<pages) { %><a href="<%= pageUrl(page+1) %>"><%= t('ถัดไป ›') %></a><% } %></div>
+<%# pager: 100 rows a page, "page X of Y"; the number box jumps (form #pg below, so the filter popups never send a page) %>
+<% if (total) { const pbtn = (n, label, sym) => (n >= 1 && n <= pages && n !== page)
+     ? `<a class="pbtn" href="${pageUrl(n)}" title="${label}" aria-label="${label}">${sym}</a>`
+     : `<span class="pbtn off" aria-hidden="true">${sym}</span>`; %>
+<div class="pager pof">
+  <span class="range"><%= t('แสดง {a}–{b} จาก {n} รายการ', { a: ((page - 1) * perPage + 1).toLocaleString(), b: Math.min(page * perPage, total).toLocaleString(), n: total.toLocaleString() }) %></span>
+  <div class="pnav" role="navigation" aria-label="<%= t('เลือกหน้า') %>">
+    <%- pbtn(1, t('หน้าแรก'), '«') %><%- pbtn(page - 1, t('หน้าก่อนหน้า'), '‹') %>
+    <label class="pnum"><%= t('หน้า|pager') %> <input form="pg" type="number" name="page" min="1" max="<%= pages %>" value="<%= page %>" inputmode="numeric" aria-label="<%= t('เลขหน้า') %>"> <%= t('จาก {pages}', { pages: pages.toLocaleString() }) %></label>
+    <%- pbtn(page + 1, t('หน้าถัดไป'), '›') %><%- pbtn(pages, t('หน้าสุดท้าย'), '»') %>
+  </div>
+</div>
 <% } %>
 
 <%# ---- filter popups (one per column) ---- %>
@@ -65,6 +75,11 @@
   <label><%= t('มีข้อความ') %><input type="search" name="q" value="<%= sel.q %>" placeholder="<%= t('เลข / ชื่อไฟล์ / email / IP') %>"></label>
   <div class="fact"><button type="button" class="btn ghost sm" data-clear><%= t('ล้าง') %></button><button class="btn sm"><%= t('ตกลง') %></button></div>
 </div>
+</form>
+<form id="pg" method="get" action="/activity" hidden>
+  <% if (sel.from) { %><input type="hidden" name="from" value="<%= sel.from %>"><% } %><% if (sel.to) { %><input type="hidden" name="to" value="<%= sel.to %>"><% } %>
+  <% sel.users.forEach(v => { %><input type="hidden" name="user" value="<%= v %>"><% }) %><% sel.actions.forEach(v => { %><input type="hidden" name="action" value="<%= v %>"><% }) %>
+  <% if (sel.q) { %><input type="hidden" name="q" value="<%= sel.q %>"><% } %>
 </form>
 <script>
 (function () {
@@ -123,6 +138,16 @@
       });
     });
   });
+  // pager: type a page number, Enter (or leave the box) to go there
+  var pn = document.querySelector('.pnum input');
+  if (pn) {
+    var go = function () {
+      var n = Math.round(Number(pn.value)) || 1, max = Number(pn.max); n = Math.min(Math.max(n, 1), max); pn.value = n;
+      if (n !== Number(pn.defaultValue)) { var f = document.getElementById('pg'); f.requestSubmit ? f.requestSubmit() : f.submit(); }
+    };
+    pn.addEventListener('change', go);
+    pn.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); go(); } });
+  }
   // back from the next page: the inputs disabled on submit are usable again
   addEventListener('pageshow', function () { form.querySelectorAll('input').forEach(function (x) { x.disabled = false; }); });
   // a list with everything (or nothing) ticked is no filter: send nothing for it

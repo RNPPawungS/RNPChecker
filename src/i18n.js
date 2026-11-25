@@ -66,6 +66,16 @@ const EN = {
   'ลบแล้ว': 'deleted',
   'การกระทำ': 'Action',
   'ดูผล': 'View result',
+  // activity: pager (100 rows a page)
+  'แสดง {a}–{b} จาก {n} รายการ': 'Showing {a}–{b} of {n}',
+  'เลือกหน้า': 'Pages',
+  'หน้าแรก': 'First page',
+  'หน้าก่อนหน้า': 'Previous page',
+  'หน้าถัดไป': 'Next page',
+  'หน้าสุดท้าย': 'Last page',
+  'หน้า|pager': 'Page',
+  'เลขหน้า': 'Page number',
+  'จาก {pages}': 'of {pages}',
   // activity: column filters
   'ตัวกรอง': 'Filter',
   'กรอง {col}': 'Filter {col}',
@@ -357,16 +367,21 @@ function route(app) {
   });
 }
 
-// Flags used as the language switch (3:2, cropped to the same size): Thai, UK (English), Taiwan (Traditional Chinese)
+// Flags used as the language switch (3:2, cropped to the same size): Thai, UK (English), China (Chinese)
 const FLAG = {
   th: '<svg viewBox="0 0 9 6" aria-hidden="true"><rect width="9" height="6" fill="#A51931"/><rect y="1" width="9" height="4" fill="#F4F5F8"/><rect y="2" width="9" height="2" fill="#2D2A4A"/></svg>',
   en: '<svg viewBox="0 0 60 30" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><clipPath id="ukT"><path d="M30,15h30v15zv15h-30zh-30v-15zv-15h30z"/></clipPath>'
     + '<rect width="60" height="30" fill="#012169"/><path d="M0,0 60,30M60,0 0,30" stroke="#fff" stroke-width="6"/>'
     + '<path d="M0,0 60,30M60,0 0,30" clip-path="url(#ukT)" stroke="#C8102E" stroke-width="4"/>'
     + '<path d="M30,0v30M0,15h60" stroke="#fff" stroke-width="10"/><path d="M30,0v30M0,15h60" stroke="#C8102E" stroke-width="6"/></svg>',
-  // Traditional Chinese: flag of Taiwan
-  zh: '<svg viewBox="0 0 240 160" aria-hidden="true"><rect width="240" height="160" fill="#FE0000"/><rect width="120" height="80" fill="#000095"/>'
-    + '<polygon fill="#fff" points="60.0,10.0 64.3,24.1 75.0,14.0 71.7,28.3 86.0,25.0 75.9,35.7 90.0,40.0 75.9,44.3 86.0,55.0 71.7,51.7 75.0,66.0 64.3,55.9 60.0,70.0 55.7,55.9 45.0,66.0 48.3,51.7 34.0,55.0 44.1,44.3 30.0,40.0 44.1,35.7 34.0,25.0 48.3,28.3 45.0,14.0 55.7,24.1"/><circle cx="60" cy="40" r="17" fill="#000095"/><circle cx="60" cy="40" r="15" fill="#fff"/></svg>',
+  // Chinese: flag of the People's Republic of China (large star and 4 small stars, each pointing at the large one)
+  zh: '<svg viewBox="0 0 30 20" aria-hidden="true"><rect width="30" height="20" fill="#EE1C25"/><g fill="#FFFF00">'
+    + '<polygon points="5,2 5.67,4.07 7.85,4.07 6.09,5.35 6.76,7.43 5,6.15 3.24,7.43 3.91,5.35 2.15,4.07 4.33,4.07"/>'
+    + '<polygon points="9.14,2.51 9.62,1.97 9.25,1.34 9.91,1.63 10.39,1.08 10.33,1.8 11,2.09 10.29,2.25 10.22,2.97 9.85,2.35"/>'
+    + '<polygon points="11.01,4.14 11.66,3.82 11.56,3.1 12.07,3.62 12.72,3.3 12.38,3.95 12.88,4.47 12.17,4.34 11.83,4.99 11.73,4.27"/>'
+    + '<polygon points="11.04,6.73 11.76,6.7 11.96,6 12.21,6.68 12.94,6.66 12.37,7.1 12.62,7.79 12.01,7.38 11.44,7.83 11.64,7.13"/>'
+    + '<polygon points="9.22,8.38 9.9,8.63 10.35,8.06 10.32,8.79 11,9.05 10.3,9.24 10.26,9.96 9.87,9.36 9.16,9.55 9.62,8.98"/>'
+    + '</g></svg>',
 };
 
 module.exports = { EN, ZH, FRAG, FRAG_ZH, LANGS, HTML_LANG, make, T, middleware, route, FLAG };
