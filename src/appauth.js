@@ -12,6 +12,8 @@ const QRCode = require('qrcode');
 const PAIR_TTL = 10 * 60; // seconds
 const APP_TTL = 180 * 24 * 3600;
 const APK = path.join(__dirname, '..', 'public', 'app', 'rnp-checker.apk');
+// handhelds cannot resolve the domain name, so the download link/QR points at the server's IP
+const APP_URL = (process.env.APP_SERVER_URL || 'https://10.80.0.9').replace(/\/+$/, '');
 
 const hmac = (s) => crypto.createHmac('sha256', String(process.env.SESSION_SECRET)).update(s).digest('hex').slice(0, 40);
 const now = () => Math.floor(Date.now() / 1000);
@@ -46,13 +48,12 @@ function bearer(db) {
 
 function routes(app, { db, auth }) {
   const json = express.json({ limit: '2kb' });
-  const base = (req) => process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
 
   // page with the pairing QR (scan it with the handheld) + APK download
   app.get('/app/pair', auth, async (req, res) => {
     const code = sign('p', req.user.id, PAIR_TTL);
     const qr = await QRCode.toString(code, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' });
-    const dl = `${base(req)}/app/download`;
+    const dl = `${APP_URL}/app/download`;
     const dlQr = await QRCode.toString(dl, { type: 'svg', margin: 1 });
     res.render('app_pair', { qr, code, dl, dlQr, hasApk: fs.existsSync(APK), ttlMin: PAIR_TTL / 60 });
   });

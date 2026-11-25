@@ -250,6 +250,9 @@ public class MainActivity extends Activity {
             }
         });
         alt.addView(g, new LinearLayout.LayoutParams(-1, dp(52)));
+        TextView gNote = text("ใช้ได้เฉพาะเครื่องที่เข้า packing.rnpexpress.co.th ได้ ถ้าไม่ได้ให้ใช้วิธียิง QR ด้านบน", 12, MUTED, false);
+        gNote.setPadding(0, dp(4), 0, 0);
+        alt.addView(gNote);
         TextView srv = text("เซิร์ฟเวอร์: " + api.server(), 14, MUTED, false);
         srv.setPadding(0, dp(12), 0, 0);
         alt.addView(srv);
@@ -340,6 +343,7 @@ public class MainActivity extends Activity {
         tabs.addView(gap, new LinearLayout.LayoutParams(dp(8), 1));
         tabs.addView(tabButton("2. Cross Ref Check", "cross"), new LinearLayout.LayoutParams(0, dp(48), 1));
         page.addView(tabs);
+        page.addView(dateBar());
 
         LinearLayout input = card();
         LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(-1, -2);
@@ -380,6 +384,67 @@ public class MainActivity extends Activity {
         root.addView(alertFrame, new FrameLayout.LayoutParams(-1, -1));
         refocus();
         refreshLogs(0);
+    }
+
+    // ---- Operation Date: every check searches only this date. Defaults to today; a date picked on an earlier day resets.
+    private Button dateBtn;
+
+    private static String today() { return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date()); }
+
+    private String opDate() {
+        String d = prefs.getString("opDate", "");
+        if (d.isEmpty() || !today().equals(prefs.getString("opDateSetOn", ""))) return today();
+        return d;
+    }
+
+    private void setOpDate(String ymd) {
+        prefs.edit().putString("opDate", ymd).putString("opDateSetOn", today()).apply();
+        styleDateBtn();
+        refocus();
+    }
+
+    private void styleDateBtn() {
+        String d = opDate();
+        boolean isToday = d.equals(today());
+        dateBtn.setText(d.substring(8, 10) + "/" + d.substring(5, 7) + "/" + d.substring(0, 4) + " ▾");
+        dateBtn.setTextColor(isToday ? INK : 0xFF92400E);
+        dateBtn.setBackground(pressable(isToday ? Color.WHITE : 0xFFFEF3C7, 0xFFE5E7EB, isToday ? 0xFFD1D5DB : NF, dp(8)));
+    }
+
+    private View dateBar() {
+        LinearLayout bar = hbox();
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setPadding(dp(12), dp(8), dp(8), 0);
+        bar.addView(text("Operation Date", 14, INK, true), new LinearLayout.LayoutParams(-2, -2));
+        dateBtn = button("", Color.WHITE, INK, true);
+        dateBtn.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        dateBtn.setTextSize(16);
+        dateBtn.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                String d = opDate();
+                android.app.DatePickerDialog dp = new android.app.DatePickerDialog(MainActivity.this, new android.app.DatePickerDialog.OnDateSetListener() {
+                    @Override public void onDateSet(android.widget.DatePicker view, int y, int m, int day) {
+                        setOpDate(String.format(Locale.US, "%04d-%02d-%02d", y, m + 1, day));
+                    }
+                }, Integer.parseInt(d.substring(0, 4)), Integer.parseInt(d.substring(5, 7)) - 1, Integer.parseInt(d.substring(8, 10)));
+                dp.setOnDismissListener(new DialogInterface.OnDismissListener() {
+                    @Override public void onDismiss(DialogInterface x) { refocus(); }
+                });
+                dp.show();
+            }
+        });
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(44), 1);
+        lp.leftMargin = dp(8);
+        bar.addView(dateBtn, lp);
+        Button now = chip("วันนี้", false);
+        now.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { setOpDate(today()); }
+        });
+        LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(dp(64), dp(44));
+        np.leftMargin = dp(6);
+        bar.addView(now, np);
+        styleDateBtn();
+        return bar;
     }
 
     private View tabButton(String label, final String key) {
@@ -533,6 +598,7 @@ public class MainActivity extends Activity {
 
     private void doRef(final String q) {
         final String type = prefs.getString("refType", "auto");
+        final String day = opDate();
         startWait(pairs("เลขที่ยิง", q, "hl"));
         if (listIsBox) { listIsBox = false; refreshLogs(0); }
         net.execute(new Runnable() {
@@ -541,6 +607,7 @@ public class MainActivity extends Activity {
                     JSONObject body = new JSONObject();
                     body.put("q", q);
                     body.put("type", type);
+                    body.put("date", day);
                     final JSONObject d = api.post("/api/checker/ref", body);
                     ui.post(new Runnable() { @Override public void run() { showRef(q, d); } });
                 } catch (final Exception e) {
@@ -556,23 +623,30 @@ public class MainActivity extends Activity {
             panel(R_NF, "ไม่พบ", pairs("เลขที่ยิง", q, "hl"), d.optString("message"), q + " → ไม่พบ");
         } else if ("waybill".equals(d.optString("kind"))) {
             List<String[]> p = pairs("Waybill No. (ที่ยิง)", d.optString("waybill_no"), "hl");
-            p.add(new String[]{"Box No.", d.optString("box_no"), "big"});
-            p.add(new String[]{"Operation Date", d.optString("operation_date"), ""});
             p.add(new String[]{"ในกล่องนี้", d.optInt("box_count") + " รายการ", ""});
-            panel(R_OK, "Box No. " + d.optString("box_no"), p, null, d.optString("waybill_no") + " → Box " + d.optString("box_no"));
+            p.add(new String[]{"Operation Date", d.optString("operation_date"), ""});
+            panel(R_OK, "พบ Box No.", p, null, d.optString("waybill_no") + " → Box " + d.optString("box_no"),
+                    "Box No.", new String[]{d.optString("box_no")});
         } else {
             List<String[]> p = pairs("Box No. (ที่ยิง)", d.optString("box_no"), "hl");
-            p.add(new String[]{"จำนวน Waybill", d.optInt("count") + " รายการ", "big"});
             JSONArray dates = d.optJSONArray("dates");
             StringBuilder ds = new StringBuilder();
             for (int i = 0; dates != null && i < dates.length(); i++) ds.append(i > 0 ? ", " : "").append(dates.optString(i));
             p.add(new String[]{"Operation Date", ds.toString(), ""});
-            panel(R_OK, d.optInt("count") + " Waybill", p, null, "Box " + d.optString("box_no") + " → " + d.optInt("count") + " Waybill");
+            int n = d.optInt("count");
+            JSONArray w0 = d.optJSONArray("waybills");
+            String[] hero;
+            if (n <= 3 && w0 != null) {
+                hero = new String[w0.length()];
+                for (int i = 0; i < hero.length; i++) hero[i] = w0.optJSONObject(i).optString("waybill_no");
+            } else hero = new String[]{n + " รายการ ↓"};
+            panel(R_OK, "พบ " + n + " Waybill", p, null, "Box " + d.optString("box_no") + " → " + n + " Waybill",
+                    "Waybill No. ในกล่องนี้", hero);
             JSONArray wbs = d.optJSONArray("waybills");
             List<Row> rows = new ArrayList<>();
             for (int i = 0; wbs != null && i < wbs.length(); i++) {
                 JSONObject w = wbs.optJSONObject(i);
-                rows.add(new Row(String.valueOf(i + 1), w.optString("waybill_no"), w.optString("operation_date"), 0, null));
+                rows.add(new Row(String.valueOf(i + 1), w.optString("waybill_no"), w.optString("operation_date"), 0, null).big());
             }
             listIsBox = true;
             listTitle.setText("Waybill No. ในกล่อง " + d.optString("box_no") + " (" + rows.size() + ")");
@@ -584,6 +658,7 @@ public class MainActivity extends Activity {
 
     private void doCross(final String first, final String second) {
         final boolean wb = wbFirst();
+        final String day = opDate();
         List<String[]> p = pairs(wb ? "Waybill No." : "Box No.", first, "hl");
         p.add(new String[]{wb ? "Box No." : "Waybill No.", second, "hl"});
         startWait(p);
@@ -594,6 +669,7 @@ public class MainActivity extends Activity {
                     body.put("order", wb ? "wb" : "bw");
                     body.put("first", first);
                     body.put("second", second);
+                    body.put("date", day);
                     final JSONObject d = api.post("/api/checker/cross", body);
                     ui.post(new Runnable() { @Override public void run() { showCross(wb, d); } });
                 } catch (final Exception e) {
@@ -749,6 +825,11 @@ public class MainActivity extends Activity {
     };
 
     private void panel(int cls, String title, List<String[]> p, String msg, String summary) {
+        panel(cls, title, p, msg, summary, null, null);
+    }
+
+    /** heroLabel/heroValues: the answer of a Ref Check shown in very large type (Box No. for a waybill, Waybill No. for a box). */
+    private void panel(int cls, String title, List<String[]> p, String msg, String summary, String heroLabel, String[] heroValues) {
         ui.removeCallbacks(staleTask);
         int bg = cls == R_OK ? OK : cls == R_BAD ? BAD : cls == R_NF ? NF : WAIT;
         LinearLayout v = vbox();
@@ -777,6 +858,23 @@ public class MainActivity extends Activity {
         ht.addView(tt);
         head.addView(ht, new LinearLayout.LayoutParams(0, -2, 1));
         v.addView(head);
+
+        if (heroValues != null && heroValues.length > 0) {
+            LinearLayout hero = vbox();
+            hero.setBackground(round(Color.WHITE, dp(12), 0));
+            hero.setPadding(dp(12), dp(6), dp(12), dp(8));
+            hero.addView(text(heroLabel, 14, MUTED, true));
+            for (String hv : heroValues) {
+                int len = hv.length();
+                TextView hvt = text(hv, len <= 10 ? 46 : len <= 13 ? 38 : len <= 17 ? 30 : 24, INK, true);
+                hvt.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+                hvt.setLineSpacing(0, .9f);
+                hero.addView(hvt);
+            }
+            LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(-1, -2);
+            hp.topMargin = dp(8);
+            v.addView(hero, hp);
+        }
 
         if (p != null && !p.isEmpty()) {
             LinearLayout grid = vbox();
@@ -1157,7 +1255,8 @@ public class MainActivity extends Activity {
     // ------------------------------------------------------------------ list
 
     static final class Row {
-        final String left, main, sub, tag; final int color;
+        final String left, main, sub, tag; final int color; boolean big;
+        Row big() { big = true; return this; }
         Row(String left, String main, String sub, int color, String tag) {
             this.left = left; this.main = main; this.sub = sub; this.color = color; this.tag = tag;
         }
@@ -1200,6 +1299,7 @@ public class MainActivity extends Activity {
             Row row = rows.get(i);
             h.left.setText(row.left);
             h.main.setText(row.main);
+            h.main.setTextSize(TypedValue.COMPLEX_UNIT_SP, row.big ? 24 : 15);
             h.sub.setText(row.sub);
             h.sub.setVisibility(TextUtils.isEmpty(row.sub) ? View.GONE : View.VISIBLE);
             if (row.tag != null) {
