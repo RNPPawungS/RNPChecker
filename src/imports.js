@@ -26,7 +26,7 @@ module.exports = function registerImports(app, { db, auth, upload }) {
   });
 
   app.post('/upload', auth, upload.single('file'), async (req, res) => {
-    const fail = async (msg) => { res.locals.flash = { type: 'error', msg }; res.render('upload', { history: await history() }); };
+    const fail = async (msg) => { res.locals.flash = { type: 'error', msg: req.t(msg) }; res.render('upload', { history: await history() }); };
     if (!req.file) return fail('กรุณาเลือกไฟล์ .xlsx หรือ .csv');
     const started = Date.now();
     const filename = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
@@ -110,7 +110,7 @@ module.exports = function registerImports(app, { db, auth, upload }) {
   app.get('/upload/:id(\\d+)', auth, async (req, res) => {
     const id = Number(req.params.id);
     const [[up]] = await db.query('SELECT up.*, u.email, u.name FROM uploads up JOIN users u ON u.id=up.user_id WHERE up.id=?', [id]);
-    if (!up) return res.status(404).send('ไม่พบรายการอัปโหลดนี้');
+    if (!up) return res.status(404).send(req.t('ไม่พบรายการอัปโหลดนี้'));
     const f = filterSql(req.query);
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const [[{ total }]] = await db.query(`SELECT COUNT(*) total FROM upload_rows WHERE ${f.sql}`, [id, ...f.args]);
@@ -127,26 +127,27 @@ module.exports = function registerImports(app, { db, auth, upload }) {
   app.get('/upload/:id(\\d+)/export', auth, async (req, res) => {
     const id = Number(req.params.id);
     const [[up]] = await db.query('SELECT filename FROM uploads WHERE id=?', [id]);
-    if (!up) return res.status(404).send('ไม่พบรายการอัปโหลดนี้');
+    if (!up) return res.status(404).send(req.t('ไม่พบรายการอัปโหลดนี้'));
     const f = filterSql(req.query);
     const [rows] = await db.query(`SELECT * FROM upload_rows WHERE ${f.sql} ORDER BY line_no`, [id, ...f.args]);
     const wb = new ExcelJS.Workbook();
-    const ws = wb.addWorksheet('ผลการ import');
+    const t = req.t;
+    const ws = wb.addWorksheet(t('ผลการ import'));
     ws.columns = [
-      { header: 'แถวในไฟล์', key: 'line_no', width: 10 },
+      { header: t('แถวในไฟล์'), key: 'line_no', width: 10 },
       { header: 'Box No.', key: 'box_no', width: 18 },
       { header: 'Waybill No.', key: 'waybill_no', width: 22 },
       { header: 'Operation Date', key: 'date', width: 16 },
-      { header: 'สถานะ', key: 'status', width: 16 },
-      { header: 'รายละเอียด', key: 'message', width: 60 },
-      { header: 'Box No. เดิม', key: 'old_box_no', width: 18 },
-      { header: 'Operation Date เดิม', key: 'old_date', width: 18 },
+      { header: t('สถานะ'), key: 'status', width: 16 },
+      { header: t('รายละเอียด'), key: 'message', width: 60 },
+      { header: t('Box No. เดิม'), key: 'old_box_no', width: 18 },
+      { header: t('Operation Date เดิม'), key: 'old_date', width: 18 },
     ];
     ws.getRow(1).font = { bold: true };
     ws.addRows(rows.map((r) => ({
       line_no: r.line_no, box_no: r.box_no, waybill_no: r.waybill_no,
       date: r.operation_date ? dmy(r.operation_date) : r.raw_date,
-      status: STATUS[r.status], message: r.message, old_box_no: r.old_box_no, old_date: dmy(r.old_operation_date),
+      status: t(STATUS[r.status]), message: r.message && t(r.message), old_box_no: r.old_box_no, old_date: dmy(r.old_operation_date),
     })));
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="import-result-${id}.xlsx"`);

@@ -1,24 +1,24 @@
 <%- include('_head') %>
-<h1>แอป Android (Checker)</h1>
+<h1><%= t('แอป Android (Checker)') %></h1>
 <div class="grid2">
   <div class="card center">
-    <h3><span class="step">1</span>เข้าสู่ระบบในแอป</h3>
-    <p>เปิดแอป <b>RNP Checker</b> บนเครื่อง handheld แล้ว<b>ยิงบาร์โค้ด QR นี้</b><br>แอปจะเข้าสู่ระบบเป็น <b><%= user.email %></b></p>
+    <h3><span class="step">1</span><%= t('เข้าสู่ระบบในแอป') %></h3>
+    <p><%- t.h('เปิดแอป <b>RNP Checker</b> บนเครื่อง handheld แล้ว<b>ยิงบาร์โค้ด QR นี้</b><br>แอปจะเข้าสู่ระบบเป็น <b>{email}</b>', { email: user.email }) %></p>
     <div class="qr"><%- qr %></div>
-    <p class="muted sm">QR ใช้ได้ <span id="left"><%= ttlMin %>:00</span> นาที · <a href="/app/pair">สร้าง QR ใหม่</a></p>
-    <details class="sm"><summary>แสดงรหัส (กรณีพิมพ์เอง)</summary><p class="mono" style="word-break:break-all"><%= code %></p></details>
+    <p class="muted sm"><%= t('QR ใช้ได้') %> <span id="left"><%= ttlMin %>:00</span> <%= t('นาที') %> · <a href="/app/pair"><%= t('สร้าง QR ใหม่') %></a></p>
+    <details class="sm"><summary><%= t('แสดงรหัส (กรณีพิมพ์เอง)') %></summary><p class="mono" style="word-break:break-all"><%= code %></p></details>
   </div>
   <div class="card center">
-    <h3><span class="step">2</span>ติดตั้งแอป</h3>
+    <h3><span class="step">2</span><%= t('ติดตั้งแอป') %></h3>
     <% if (hasApk) { %>
-      <p>สแกน QR นี้ด้วยกล้อง/เบราว์เซอร์ของเครื่อง หรือเปิดลิงก์</p>
+      <p><%= t('สแกน QR นี้ด้วยกล้อง/เบราว์เซอร์ของเครื่อง หรือเปิดลิงก์') %></p>
       <div class="qr"><%- dlQr %></div>
       <p class="mono sm"><%= dl %></p>
-      <p><a class="btn" href="/app/download">⬇️ ดาวน์โหลด rnp-checker.apk</a></p>
+      <p><a class="btn" href="/app/download">⬇️ <%= t('ดาวน์โหลด rnp-checker.apk') %></a></p>
     <% } else { %>
-      <p class="muted">ยังไม่มีไฟล์ APK บนเซิร์ฟเวอร์ (วางไฟล์ไว้ที่ public/app/rnp-checker.apk)</p>
+      <p class="muted"><%= t('ยังไม่มีไฟล์ APK บนเซิร์ฟเวอร์ (วางไฟล์ไว้ที่ public/app/rnp-checker.apk)') %></p>
     <% } %>
-    <p class="muted sm">ตอนติดตั้งให้อนุญาต "ติดตั้งแอปที่ไม่รู้จัก" ให้กับเบราว์เซอร์ / ตัวจัดการไฟล์ · ถ้าเบราว์เซอร์เตือนเรื่องใบรับรอง ให้กด "ขั้นสูง" แล้ว "ไปต่อ"</p>
+    <p class="muted sm"><%= t('ตอนติดตั้งให้อนุญาต "ติดตั้งแอปที่ไม่รู้จัก" ให้กับเบราว์เซอร์ / ตัวจัดการไฟล์ · ถ้าเบราว์เซอร์เตือนเรื่องใบรับรอง ให้กด "ขั้นสูง" แล้ว "ไปต่อ"') %></p>
   </div>
 </div>
 <script>

@@ -40,6 +40,14 @@ nav a.on{background:var(--pri-50);color:var(--pri);font-weight:600}nav a.on svg{
 .me .icon-btn{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:#fff;display:grid;place-items:center;cursor:pointer;color:var(--muted);transition:all .15s}
 .me .icon-btn:hover{color:var(--pri);border-color:var(--pri-100);background:var(--pri-50)}
 .me .icon-btn svg{width:18px;height:18px}
+/* language switch: national flags */
+.lang{display:flex;gap:2px;padding:3px;border:1px solid var(--line);border-radius:999px;background:#fff;flex:none}
+.lang a{display:grid;place-items:center;width:36px;height:26px;border-radius:999px;opacity:.6;filter:grayscale(.4);transition:opacity .15s,filter .15s,background .15s}
+.lang a:hover{opacity:.9;filter:none;text-decoration:none}
+.lang a.on{opacity:1;filter:none;background:var(--line2)}
+.lang svg{width:24px;height:16px;border-radius:3px;display:block;overflow:hidden;box-shadow:0 0 0 1px rgba(15,23,42,.14)}
+.lang-float{position:absolute;top:16px;right:16px;z-index:5}
+.lang-float .lang{box-shadow:var(--sh)}
 
 /* ---------- page head ---------- */
 .phead{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:20px}
@@ -237,7 +245,7 @@ details summary{cursor:pointer}
 @media (max-width:900px){
   .bar{flex-wrap:wrap;gap:10px 14px;padding:10px 0}
   nav{order:3;flex-basis:100%;margin:0 -4px}
-  .me{margin-left:auto}.me .who{display:none}
+  .lang{margin-left:auto}.me .who{display:none}
 }
 @media (max-width:700px){
   .wrap{padding:0 14px}main.wrap{padding-top:16px}
