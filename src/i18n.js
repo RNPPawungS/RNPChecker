@@ -1,5 +1,6 @@
-// Two languages: Thai (default, the source text) and English.
-// Views write the Thai text and wrap it: <%= t('ค้นหา') %>. With English selected, t() looks the text up in EN.
+// Three languages: Thai (default, the source text), English and Traditional Chinese (i18n-zh.js).
+// Views write the Thai text and wrap it: <%= t('ค้นหา') %>. With English / Chinese selected, t() looks the text up in EN / ZH
+// (a text missing from ZH falls back to English).
 // "{name}" placeholders are filled from the second argument: t('สวัสดี {name}', { name }).
 // "text|context" keys separate identical Thai words that need different English (the part after | is never shown).
 // Messages built elsewhere and stored in the database (import errors, check results) are translated by FRAG rules,
@@ -62,12 +63,29 @@ const EN = {
   'ประวัติการใช้งาน': 'Activity history',
   'ใครทำอะไรในระบบ เมื่อไร': 'Who did what in the system, and when',
   'ใครทำอะไรในระบบ เมื่อไร (เห็นเฉพาะผู้ดูแลระบบ)': 'Who did what in the system, and when (visible to admins only)',
-  'ค้นหา email / เลข / ชื่อไฟล์ / IP': 'Search email / number / file name / IP',
-  'ผู้ใช้ทั้งหมด': 'All users',
   'ลบแล้ว': 'deleted',
   'การกระทำ': 'Action',
-  'ทุกการกระทำ': 'All actions',
   'ดูผล': 'View result',
+  // activity: column filters
+  'ตัวกรอง': 'Filter',
+  'กรอง {col}': 'Filter {col}',
+  'ลบตัวกรองนี้': 'Remove this filter',
+  'ล้างตัวกรอง': 'Reset filters',
+  'ตั้งแต่': 'From',
+  '7 วันล่าสุด': 'Last 7 days',
+  '30 วันล่าสุด': 'Last 30 days',
+  'ตกลง': 'OK',
+  'ค้นหาในรายการ': 'Search the list',
+  'เลือกทั้งหมด': 'Select all',
+  'ไม่เลือกทั้งหมด': 'Select none',
+  'มีข้อความ': 'Contains',
+  'เลข / ชื่อไฟล์ / email / IP': 'number / file name / email / IP',
+  'เวลา: {v}': 'Time: {v}',
+  'ผู้ใช้: {v}': 'User: {v}',
+  'การกระทำ: {v}': 'Action: {v}',
+  'ข้อความ: "{v}"': 'Text: "{v}"',
+  '{n} คน': many('{n} user', '{n} users'),
+  '{n} แบบ': many('{n} action', '{n} actions'),
   'เข้าสู่ระบบ': 'Sign in',
   'เข้าสู่ระบบแอป Android': 'Sign in to the Android app',
   'ลบรายการ': 'Delete records',
@@ -278,24 +296,32 @@ const FRAG = [
   [/^บันทึกไม่สำเร็จ ไม่มีข้อมูลใดถูกบันทึก: /, 'Saving failed, nothing was saved: '],
 ];
 
-const LANGS = ['th', 'en'];
-const has = (k) => Object.prototype.hasOwnProperty.call(EN, k);
+const { ZH, FRAG_ZH } = require('./i18n-zh');
+
+const LANGS = ['th', 'en', 'zh'];
+const DICT = { en: EN, zh: ZH };
+const FRAGS = { en: FRAG, zh: FRAG_ZH };
+/** the value of the lang attribute for HTML */
+const HTML_LANG = { th: 'th', en: 'en', zh: 'zh-Hant' };
+const own = (d, k) => Object.prototype.hasOwnProperty.call(d, k);
+const has = (k) => own(EN, k);
 const THAI = /[฀-๿]/;
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
-function frag(s) {
+function frag(s, lang = 'en') {
   if (!THAI.test(s)) return s;
-  for (const [re, rep] of FRAG) { re.lastIndex = 0; s = s.replace(re, rep); }
+  for (const [re, rep] of FRAGS[lang]) { re.lastIndex = 0; s = s.replace(re, rep); }
   return s;
 }
 
 function make(lang) {
-  const en = lang === 'en';
+  const d = DICT[lang]; // undefined for Thai
   const text = (s, vars) => {
     s = String(s);
-    if (!has(s)) return en ? frag(s) : s;
-    if (!en) return s.split('|')[0];
-    return typeof EN[s] === 'function' ? EN[s](vars || {}) : EN[s];
+    if (!d) return has(s) ? s.split('|')[0] : s;
+    const v = own(d, s) ? d[s] : has(s) ? EN[s] : null;
+    if (v == null) return frag(s, lang);
+    return typeof v === 'function' ? v(vars || {}) : v;
   };
   const fill = (s, vars, enc) => (vars ? s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? enc(vars[k]) : m)) : s);
   /** plain text (escape it with <%= %>) */
@@ -304,22 +330,23 @@ function make(lang) {
   t.h = (s, vars) => fill(text(s, vars), vars, esc);
   /** a JavaScript string literal for inline scripts */
   t.js = (s, vars) => JSON.stringify(t(s, vars)).replace(/</g, '\\u003c');
-  t.lang = en ? 'en' : 'th';
+  t.lang = lang;
+  t.html = HTML_LANG[lang];
   return t;
 }
-const T = { th: make('th'), en: make('en') };
+const T = Object.fromEntries(LANGS.map((l) => [l, make(l)]));
 
-/** Language from the "lang" cookie (Thai when missing). Sets req.t, res.locals.t and res.locals.lang. */
+/** Language from the "lang" cookie (Thai when missing): th | en | zh. Sets req.t, res.locals.t and res.locals.lang. */
 function middleware(req, res, next) {
-  const m = /(?:^|;\s*)lang=(th|en)\b/.exec(req.headers.cookie || '');
+  const m = /(?:^|;\s*)lang=(th|en|zh)\b/.exec(req.headers.cookie || '');
   const t = T[m ? m[1] : 'th'];
   req.t = t; res.locals.t = t; res.locals.lang = t.lang;
   next();
 }
 
-/** GET /lang/th|en: remember the choice for a year and go back to the page it was clicked on. */
+/** GET /lang/th|en|zh: remember the choice for a year and go back to the page it was clicked on. */
 function route(app) {
-  app.get('/lang/:code(th|en)', (req, res) => {
+  app.get('/lang/:code(th|en|zh)', (req, res) => {
     res.setHeader('Set-Cookie', `lang=${req.params.code}; Path=/; Max-Age=31536000; SameSite=Lax`);
     let to = '/';
     try {
@@ -330,13 +357,16 @@ function route(app) {
   });
 }
 
-// Flags used as the language switch (3:2, cropped to the same size)
+// Flags used as the language switch (3:2, cropped to the same size): Thai, UK (English), Taiwan (Traditional Chinese)
 const FLAG = {
   th: '<svg viewBox="0 0 9 6" aria-hidden="true"><rect width="9" height="6" fill="#A51931"/><rect y="1" width="9" height="4" fill="#F4F5F8"/><rect y="2" width="9" height="2" fill="#2D2A4A"/></svg>',
   en: '<svg viewBox="0 0 60 30" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><clipPath id="ukT"><path d="M30,15h30v15zv15h-30zh-30v-15zv-15h30z"/></clipPath>'
     + '<rect width="60" height="30" fill="#012169"/><path d="M0,0 60,30M60,0 0,30" stroke="#fff" stroke-width="6"/>'
     + '<path d="M0,0 60,30M60,0 0,30" clip-path="url(#ukT)" stroke="#C8102E" stroke-width="4"/>'
     + '<path d="M30,0v30M0,15h60" stroke="#fff" stroke-width="10"/><path d="M30,0v30M0,15h60" stroke="#C8102E" stroke-width="6"/></svg>',
+  // Traditional Chinese: flag of Taiwan
+  zh: '<svg viewBox="0 0 240 160" aria-hidden="true"><rect width="240" height="160" fill="#FE0000"/><rect width="120" height="80" fill="#000095"/>'
+    + '<polygon fill="#fff" points="60.0,10.0 64.3,24.1 75.0,14.0 71.7,28.3 86.0,25.0 75.9,35.7 90.0,40.0 75.9,44.3 86.0,55.0 71.7,51.7 75.0,66.0 64.3,55.9 60.0,70.0 55.7,55.9 45.0,66.0 48.3,51.7 34.0,55.0 44.1,44.3 30.0,40.0 44.1,35.7 34.0,25.0 48.3,28.3 45.0,14.0 55.7,24.1"/><circle cx="60" cy="40" r="17" fill="#000095"/><circle cx="60" cy="40" r="15" fill="#fff"/></svg>',
 };
 
-module.exports = { EN, FRAG, LANGS, make, T, middleware, route, FLAG };
+module.exports = { EN, ZH, FRAG, FRAG_ZH, LANGS, HTML_LANG, make, T, middleware, route, FLAG };

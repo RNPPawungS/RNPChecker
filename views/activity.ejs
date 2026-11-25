@@ -1,24 +1,25 @@
 <%- include('_head') %>
+<%
+  // header filter button (funnel), highlighted while that column is filtered
+  const fbtn = (id, col, on) => `<button type="button" class="fbtn${on ? ' on' : ''}" data-pop="${id}" aria-haspopup="dialog" aria-expanded="false" title="${t('ตัวกรอง')}" aria-label="${t('กรอง {col}', { col })}">${icon('filter')}</button>`;
+  const allUsers = !sel.users.length; const allActs = !sel.actions.length;
+%>
 <div class="phead"><div><h1><%= t('ประวัติการใช้งาน') %></h1><p><%= t('ใครทำอะไรในระบบ เมื่อไร (เห็นเฉพาะผู้ดูแลระบบ)') %></p></div></div>
-<form class="card filters" method="get">
-  <input name="q" placeholder="<%= t('ค้นหา email / เลข / ชื่อไฟล์ / IP') %>" value="<%= q.q||'' %>">
-  <select name="user" aria-label="<%= t('ผู้ใช้') %>">
-    <option value=""><%= t('ผู้ใช้ทั้งหมด') %></option>
-    <% users.forEach(u => { %><option value="<%= u.id %>" <%= String(q.user)===String(u.id) ? 'selected' : '' %>><%= u.email %><%= u.deleted_at ? ' (' + t('ลบแล้ว') + ')' : '' %></option><% }) %>
-  </select>
-  <select name="group" aria-label="<%= t('การกระทำ') %>">
-    <option value=""><%= t('ทุกการกระทำ') %></option>
-    <% Object.entries(GROUPS).forEach(([k, v]) => { %><option value="<%= k %>" <%= q.group===k ? 'selected' : '' %>><%= t(v) %></option><% }) %>
-  </select>
-  <label><%= t('วันที่|from') %> <input class="dp" name="from" placeholder="dd/mm/yyyy" value="<%= q.from||'' %>" autocomplete="off"></label>
-  <label><%= t('ถึง') %> <input class="dp" name="to" placeholder="dd/mm/yyyy" value="<%= q.to||'' %>" autocomplete="off"></label>
-  <button class="btn"><%= t('ค้นหา') %></button>
-  <a class="btn ghost" href="/activity"><%= t('ล้าง') %></a>
-</form>
-<div class="card table">
-<div class="tbar"><span><%- t.h('ทั้งหมด <b>{n}</b> รายการ', { n: total.toLocaleString() }) %></span></div>
+<form method="get" action="/activity" id="af" class="card table">
+<div class="tbar">
+  <span><%- t.h('ทั้งหมด <b>{n}</b> รายการ', { n: total.toLocaleString() }) %></span>
+  <div class="chips">
+    <% chips.forEach(c => { %><span class="chip"><%= c.text %><a href="<%= c.href %>" title="<%= t('ลบตัวกรองนี้') %>" aria-label="<%= t('ลบตัวกรองนี้') %>: <%= c.text %>">×</a></span><% }) %>
+  </div>
+  <a class="btn ghost sm<%= chips.length ? '' : ' off' %>" href="/activity" <%- chips.length ? '' : 'aria-disabled="true" tabindex="-1"' %>><%- icon('reset') %><%= t('ล้างตัวกรอง') %></a>
+</div>
 <div class="scroll"><table class="activity">
-<thead><tr><th><%= t('เวลา') %></th><th><%= t('ผู้ใช้') %></th><th><%= t('การกระทำ') %></th><th><%= t('รายละเอียด') %></th></tr></thead>
+<thead><tr>
+  <th><div class="th"><span><%= t('เวลา') %></span><%- fbtn('f-time', t('เวลา'), sel.from || sel.to) %></div></th>
+  <th><div class="th"><span><%= t('ผู้ใช้') %></span><%- fbtn('f-user', t('ผู้ใช้'), !allUsers) %></div></th>
+  <th><div class="th"><span><%= t('การกระทำ') %></span><%- fbtn('f-action', t('การกระทำ'), !allActs) %></div></th>
+  <th><div class="th"><span><%= t('รายละเอียด') %></span><%- fbtn('f-text', t('รายละเอียด'), sel.q) %></div></th>
+</tr></thead>
 <tbody>
 <% rows.forEach(r => { %>
 <tr>
@@ -30,8 +31,111 @@
 <% }) %>
 <% if (!rows.length) { %><tr><td colspan="4" class="muted center"><%= t('ไม่พบข้อมูล') %></td></tr><% } %>
 </tbody></table></div>
-<% if (pages>1) { const p = (n)=>'?'+new URLSearchParams({...q,page:n}); %>
-<div class="pager"><% if (page>1) { %><a href="<%= p(page-1) %>"><%= t('‹ ก่อนหน้า') %></a><% } %><span><%= t('หน้า {page} / {pages}', { page, pages }) %></span><% if (page<pages) { %><a href="<%= p(page+1) %>"><%= t('ถัดไป ›') %></a><% } %></div>
+<% if (pages>1) { %>
+<div class="pager"><% if (page>1) { %><a href="<%= pageUrl(page-1) %>"><%= t('‹ ก่อนหน้า') %></a><% } %><span><%= t('หน้า {page} / {pages}', { page, pages }) %></span><% if (page<pages) { %><a href="<%= pageUrl(page+1) %>"><%= t('ถัดไป ›') %></a><% } %></div>
 <% } %>
+
+<%# ---- filter popups (one per column) ---- %>
+<div class="fpop" id="f-time" tabindex="-1" role="dialog" aria-label="<%= t('กรอง {col}', { col: t('เวลา') }) %>" hidden>
+  <b class="ftitle"><%= t('กรอง {col}', { col: t('เวลา') }) %></b>
+  <label><%= t('ตั้งแต่') %><input class="dp" name="from" placeholder="dd/mm/yyyy" value="<%= sel.from %>" autocomplete="off"></label>
+  <label><%= t('ถึง') %><input class="dp" name="to" placeholder="dd/mm/yyyy" value="<%= sel.to %>" autocomplete="off"></label>
+  <div class="quick"><button type="button" data-days="0"><%= t('วันนี้') %></button><button type="button" data-days="6"><%= t('7 วันล่าสุด') %></button><button type="button" data-days="29"><%= t('30 วันล่าสุด') %></button></div>
+  <div class="fact"><button type="button" class="btn ghost sm" data-clear><%= t('ล้าง') %></button><button class="btn sm"><%= t('ตกลง') %></button></div>
 </div>
+<div class="fpop" id="f-user" tabindex="-1" role="dialog" aria-label="<%= t('กรอง {col}', { col: t('ผู้ใช้') }) %>" hidden>
+  <b class="ftitle"><%= t('กรอง {col}', { col: t('ผู้ใช้') }) %></b>
+  <input type="search" class="fsearch" placeholder="<%= t('ค้นหาในรายการ') %>" aria-label="<%= t('ค้นหาในรายการ') %>">
+  <div class="fsel"><button type="button" data-all><%= t('เลือกทั้งหมด') %></button> · <button type="button" data-none><%= t('ไม่เลือกทั้งหมด') %></button></div>
+  <div class="flist">
+    <% users.forEach(u => { %><label><input type="checkbox" name="user" value="<%= u.id %>" <%= allUsers || sel.users.includes(u.id) ? 'checked' : '' %>><span><%= u.name || u.email %><% if (u.name) { %><small><%= u.email %></small><% } %><% if (u.deleted_at) { %><small>(<%= t('ลบแล้ว') %>)</small><% } %></span></label><% }) %>
+  </div>
+  <div class="fact"><button type="button" class="btn ghost sm" data-clear><%= t('ล้าง') %></button><button class="btn sm"><%= t('ตกลง') %></button></div>
+</div>
+<div class="fpop" id="f-action" tabindex="-1" role="dialog" aria-label="<%= t('กรอง {col}', { col: t('การกระทำ') }) %>" hidden>
+  <b class="ftitle"><%= t('กรอง {col}', { col: t('การกระทำ') }) %></b>
+  <div class="fsel"><button type="button" data-all><%= t('เลือกทั้งหมด') %></button> · <button type="button" data-none><%= t('ไม่เลือกทั้งหมด') %></button></div>
+  <div class="flist">
+    <% groups.forEach(g => { %><p class="fgroup"><%= t(g.label) %></p><% g.actions.forEach(a => { %><label><input type="checkbox" name="action" value="<%= a.key %>" <%= allActs || sel.actions.includes(a.key) ? 'checked' : '' %>><span><%= t(a.label) %></span></label><% }) %><% }) %>
+  </div>
+  <div class="fact"><button type="button" class="btn ghost sm" data-clear><%= t('ล้าง') %></button><button class="btn sm"><%= t('ตกลง') %></button></div>
+</div>
+<div class="fpop" id="f-text" tabindex="-1" role="dialog" aria-label="<%= t('กรอง {col}', { col: t('รายละเอียด') }) %>" hidden>
+  <b class="ftitle"><%= t('กรอง {col}', { col: t('รายละเอียด') }) %></b>
+  <label><%= t('มีข้อความ') %><input type="search" name="q" value="<%= sel.q %>" placeholder="<%= t('เลข / ชื่อไฟล์ / email / IP') %>"></label>
+  <div class="fact"><button type="button" class="btn ghost sm" data-clear><%= t('ล้าง') %></button><button class="btn sm"><%= t('ตกลง') %></button></div>
+</div>
+</form>
+<script>
+(function () {
+  var form = document.getElementById('af'), open = null, opener = null;
+  function place() {
+    if (!open) return;
+    var r = opener.getBoundingClientRect(), w = open.offsetWidth, h = open.offsetHeight;
+    var left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8));
+    var top = r.bottom + 6; if (top + h > innerHeight - 8) top = Math.max(8, innerHeight - 8 - h);
+    open.style.left = left + 'px'; open.style.top = top + 'px';
+  }
+  function close() {
+    if (!open) return;
+    open.hidden = true; opener.setAttribute('aria-expanded', 'false');
+    open = null; opener = null;
+  }
+  function show(btn) {
+    var pop = document.getElementById(btn.getAttribute('data-pop'));
+    if (open === pop) { close(); return; }
+    close(); open = pop; opener = btn;
+    pop.hidden = false; btn.setAttribute('aria-expanded', 'true'); place();
+    // focus the first field, but not a date box (its calendar would cover the quick ranges),
+    // and not on a phone, where a focused text box pops up the keyboard over the list
+    var first = matchMedia('(pointer: coarse)').matches ? null : pop.querySelector('input[type=search], input[type=checkbox]');
+    (first || pop).focus();
+  }
+  document.querySelectorAll('.fbtn').forEach(function (b) { b.addEventListener('click', function () { show(b); }); });
+  document.addEventListener('mousedown', function (e) {
+    if (!open || open.contains(e.target) || opener.contains(e.target) || e.target.closest('.flatpickr-calendar')) return;
+    close();
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && open && !document.querySelector('.flatpickr-calendar.open')) { var b = opener; close(); b.focus(); } });
+  addEventListener('resize', place); addEventListener('scroll', place, true);
+
+  // lists: "select all" / "none", search inside the list
+  document.querySelectorAll('.fpop').forEach(function (pop) {
+    var boxes = function () { return pop.querySelectorAll('.flist input[type=checkbox]'); };
+    var all = pop.querySelector('[data-all]'), none = pop.querySelector('[data-none]'), find = pop.querySelector('.fsearch');
+    if (all) all.addEventListener('click', function () { boxes().forEach(function (c) { if (!c.closest('label').hidden) c.checked = true; }); });
+    if (none) none.addEventListener('click', function () { boxes().forEach(function (c) { if (!c.closest('label').hidden) c.checked = false; }); });
+    if (find) find.addEventListener('keydown', function (e) { if (e.key === 'Enter') e.preventDefault(); });
+    if (find) find.addEventListener('input', function () {
+      var s = find.value.trim().toLowerCase();
+      boxes().forEach(function (c) { var l = c.closest('label'); l.hidden = s && l.textContent.toLowerCase().indexOf(s) < 0; });
+    });
+    // "ล้าง" = no filter on this column, then apply
+    pop.querySelector('[data-clear]').addEventListener('click', function () {
+      pop.querySelectorAll('input').forEach(function (i) { if (i.type === 'checkbox') i.checked = true; else if (i.classList.contains('dp') && i._flatpickr) i._flatpickr.clear(); else i.value = ''; });
+      form.requestSubmit ? form.requestSubmit() : form.submit();
+    });
+    // quick date ranges
+    pop.querySelectorAll('[data-days]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var to = new Date(), from = new Date(); from.setDate(to.getDate() - Number(b.getAttribute('data-days')));
+        pop.querySelector('[name=from]')._flatpickr.setDate(from, false); pop.querySelector('[name=to]')._flatpickr.setDate(to, false);
+      });
+    });
+  });
+  // back from the next page: the inputs disabled on submit are usable again
+  addEventListener('pageshow', function () { form.querySelectorAll('input').forEach(function (x) { x.disabled = false; }); });
+  // a list with everything (or nothing) ticked is no filter: send nothing for it
+  form.addEventListener('submit', function (e) {
+    ['user', 'action'].forEach(function (n) {
+      var c = form.querySelectorAll('input[name=' + n + ']'), on = 0;
+      c.forEach(function (x) { if (x.checked) on++; });
+      if (on === 0 || on === c.length) c.forEach(function (x) { x.disabled = true; });
+    });
+    form.querySelectorAll('input[name=from], input[name=to], input[name=q]').forEach(function (x) { if (!x.value.trim()) x.disabled = true; });
+    form.querySelectorAll('.fsearch').forEach(function (x) { x.disabled = true; });
+    if (!new FormData(form).entries().next().value) { e.preventDefault(); location.href = form.getAttribute('action'); } // no filters: plain /activity, not /activity?
+  });
+})();
+</script>
 <%- include('_foot') %>

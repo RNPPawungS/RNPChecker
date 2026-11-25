@@ -1,7 +1,7 @@
 <%- include('_head') %>
 <div class="hello">
   <div><h1><%= t('สวัสดี {name}', { name: user.name || user.email }) %></h1><p><%= t('ระบบจัดการและตรวจสอบข้อมูลกล่องพัสดุ') %></p></div>
-  <span class="date"><%= new Date().toLocaleDateString(lang === 'en' ? 'en-GB' : 'th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) %></span>
+  <span class="date"><%= new Date().toLocaleDateString({ en: 'en-GB', zh: 'zh-TW' }[lang] || 'th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) %></span>
 </div>
 <div class="stats">
   <div class="card stat"><span class="ic"><%- icon('data') %></span><div><span><%= t('จำนวนพัสดุทั้งหมด') %></span><b><%= Number(s.total).toLocaleString() %></b></div></div>

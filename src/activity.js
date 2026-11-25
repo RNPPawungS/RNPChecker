@@ -61,21 +61,27 @@ module.exports = function activity(app, { db, auth, admin, dmy }) {
     }
   }
 
+  // Filters sit in the column headers (like a Google Sheets filter): time = from/to, user = user ids, action = action keys,
+  // details = text. Several values of user / action may be chosen; none means no filter.
   app.get('/activity', auth, admin, async (req, res) => {
     const q = req.query;
     const page = Math.max(1, parseInt(q.page, 10) || 1);
-    const group = GROUPS[q.group] ? q.group : '';
-    const userId = parseInt(q.user, 10) || null;
+    const many = (v) => [...new Set([].concat(v ?? []).map(String))];
+    const userIds = many(q.user).map(Number).filter((n) => Number.isInteger(n) && n > 0);
+    const acts = many(q.action).filter((a) => ACTIONS[a]);
     const from = toDate(q.from); const to = toDate(q.to);
     const text = String(q.q || '').trim().slice(0, 100);
+    const webActs = acts.filter((a) => !a.startsWith('check_'));
+    const modes = acts.filter((a) => a.startsWith('check_')).map((a) => a.slice(6));
 
     // the same filters on both tables
     const part = (alias, isCheck) => {
       const w = []; const a = [];
-      if (userId) { w.push(`${alias}.user_id=?`); a.push(userId); }
+      if (userIds.length) { w.push(`${alias}.user_id IN (?)`); a.push(userIds); }
       if (from) { w.push(`${alias}.created_at >= ?`); a.push(from); }
       if (to) { w.push(`${alias}.created_at < DATE_ADD(?, INTERVAL 1 DAY)`); a.push(to); }
-      if (!isCheck && group) { w.push(`${alias}.action IN (?)`); a.push(Object.keys(ACTIONS).filter((k) => ACTIONS[k][0] === group)); }
+      if (!isCheck && webActs.length) { w.push(`${alias}.action IN (?)`); a.push(webActs); }
+      if (isCheck && modes.length) { w.push(`${alias}.mode IN (?)`); a.push(modes); }
       if (text) {
         const like = `%${text}%`;
         if (isCheck) { w.push('(c.input1 LIKE ? OR c.input2 LIKE ? OR u.email LIKE ? OR u.name LIKE ?)'); a.push(like, like, like, like); }
@@ -83,7 +89,7 @@ module.exports = function activity(app, { db, auth, admin, dmy }) {
       }
       return { sql: w.length ? 'WHERE ' + w.join(' AND ') : '', args: a };
     };
-    const useA = group !== 'check'; const useC = !group || group === 'check';
+    const useA = !acts.length || webActs.length > 0; const useC = !acts.length || modes.length > 0;
     const pa = part('a', false); const pc = part('c', true);
     const fromA = 'FROM activity_logs a LEFT JOIN users u ON u.id=a.user_id';
     const fromC = 'FROM check_logs c LEFT JOIN users u ON u.id=c.user_id';
@@ -109,8 +115,30 @@ module.exports = function activity(app, { db, auth, admin, dmy }) {
       [...args, PER_PAGE, (page - 1) * PER_PAGE]);
     const [users] = await db.query('SELECT id, email, name, deleted_at FROM users ORDER BY deleted_at IS NOT NULL, email');
 
+    // what the header filters show, and a chip for each active filter (its x link drops just that filter)
+    const t = req.t;
+    const sel = { users: userIds, actions: acts, from: from ? q.from : '', to: to ? q.to : '', q: text };
+    const url = (drop) => {
+      const u = new URLSearchParams();
+      if (drop !== 'time') { if (sel.from) u.append('from', sel.from); if (sel.to) u.append('to', sel.to); }
+      if (drop !== 'user') sel.users.forEach((v) => u.append('user', v));
+      if (drop !== 'action') sel.actions.forEach((v) => u.append('action', v));
+      if (drop !== 'q' && sel.q) u.append('q', sel.q);
+      const s = u.toString(); return '/activity' + (s ? '?' + s : '');
+    };
+    const chips = [];
+    if (sel.from || sel.to) chips.push({ text: t('เวลา: {v}', { v: `${sel.from || '…'} – ${sel.to || '…'}` }), href: url('time') });
+    if (userIds.length) {
+      const one = users.find((u) => u.id === userIds[0]);
+      chips.push({ text: t('ผู้ใช้: {v}', { v: userIds.length === 1 ? (one ? one.email : '#' + userIds[0]) : t('{n} คน', { n: userIds.length }) }), href: url('user') });
+    }
+    if (acts.length) chips.push({ text: t('การกระทำ: {v}', { v: acts.length === 1 ? t(ACTIONS[acts[0]][1]) : t('{n} แบบ', { n: acts.length }) }), href: url('action') });
+    if (text) chips.push({ text: t('ข้อความ: "{v}"', { v: text }), href: url('q') });
+    const groups = Object.entries(GROUPS).map(([g, label]) => ({ label, actions: Object.keys(ACTIONS).filter((k) => ACTIONS[k][0] === g).map((k) => ({ key: k, label: ACTIONS[k][1] })) }));
+
     res.render('activity', {
-      q: { ...q, group, q: text }, total, page, pages: Math.max(1, Math.ceil(total / PER_PAGE)), users, GROUPS,
+      sel, chips, groups, total, page, pages: Math.max(1, Math.ceil(total / PER_PAGE)), users,
+      pageUrl: (n) => { const base = url(null); return base + (base.includes('?') ? '&' : '?') + 'page=' + n; },
       rows: rows.map((r) => ({ ...r, when: dmy(r.created_at), group: (ACTIONS[r.action] || ['other'])[0], label: (ACTIONS[r.action] || [, r.action])[1], text: describe(r, req.t) })),
     });
   });

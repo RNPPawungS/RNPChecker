@@ -4,9 +4,9 @@
   if (active && user.role === 'admin') nav.push(['/users', t('ผู้ใช้งาน'), 'users'], ['/activity', t('ประวัติการใช้งาน'), 'history']);
   // import results (/upload/...) are part of "จัดการข้อมูล"
   const on = (h) => (h === '/' ? path === '/' : path.startsWith(h) || (h === '/data' && path.startsWith('/upload')));
-  const langs = [['th', 'ภาษาไทย'], ['en', 'English']];
+  const langs = [['th', 'ภาษาไทย', 'th'], ['en', 'English', 'en'], ['zh', '繁體中文', 'zh-Hant']];
 %><!doctype html>
-<html lang="<%= lang %>"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="<%= t.html %>"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Packing · RNP Express</title>
 <meta name="theme-color" content="#d71920">
 <% ['400','500','600','700'].forEach(function (w) { %><link rel="stylesheet" href="/vendor/font/<%= w %>.css"><% }) %>
@@ -14,7 +14,7 @@
 <link rel="stylesheet" href="/static/style.css">
 <script src="/vendor/flatpickr/flatpickr.min.js"></script></head><body class="<%= active ? 'app' : 'auth' %>">
 <% const langSwitch = function () { %><div class="lang" role="group" aria-label="<%= t('ภาษา') %>">
-  <% langs.forEach(function (l) { %><a href="/lang/<%= l[0] %>" class="<%= lang === l[0] ? 'on' : '' %>" title="<%= l[1] %>" aria-label="<%= l[1] %>" lang="<%= l[0] %>"<%- lang === l[0] ? ' aria-current="true"' : '' %>><%- flag[l[0]] %></a><% }) %>
+  <% langs.forEach(function (l) { %><a href="/lang/<%= l[0] %>" class="<%= lang === l[0] ? 'on' : '' %>" title="<%= l[1] %>" aria-label="<%= l[1] %>" lang="<%= l[2] %>"<%- lang === l[0] ? ' aria-current="true"' : '' %>><%- flag[l[0]] %></a><% }) %>
 </div><% } %>
 <% if (active) { %>
 <header class="top"><div class="wrap bar">
