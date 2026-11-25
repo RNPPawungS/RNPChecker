@@ -9,6 +9,7 @@ const multer = require('multer');
 const ExcelJS = require('exceljs');
 const db = require('./db');
 const appAuth = require('./appauth');
+const checker = require('./checker');
 const i18n = require('./i18n');
 const { readRows, buildTemplate, toDate } = require('./parse');
 
@@ -130,7 +131,8 @@ app.get('/', auth, async (req, res) => {
 // ---------- data ----------
 function filters(q) {
   const where = []; const args = [];
-  if (q.q) { where.push('(box_no LIKE ? OR waybill_no LIKE ?)'); args.push(`%${q.q}%`, `%${q.q}%`); }
+  const text = String(q.q || '').trim(); const s = checker.codabar(text) || text; // a scanned D3867497060D searches 3867497060
+  if (s) { where.push('(box_no LIKE ? OR waybill_no LIKE ?)'); args.push(`%${s}%`, `%${s}%`); }
   const from = toDate(q.from); const to = toDate(q.to);
   if (from) { where.push('operation_date >= ?'); args.push(from); }
   if (to) { where.push('operation_date <= ?'); args.push(to); }
@@ -162,7 +164,8 @@ app.get('/data/export', auth, async (req, res) => {
 });
 
 app.post('/data', auth, async (req, res) => {
-  const box = (req.body.box_no || '').trim(); const wb = (req.body.waybill_no || '').trim(); const d = toDate(req.body.operation_date);
+  const box = (req.body.box_no || '').trim(); const d = toDate(req.body.operation_date);
+  const wb0 = (req.body.waybill_no || '').trim(); const wb = checker.codabar(wb0) || wb0; // scanned Codabar: drop the start/stop letters
   if (!box || !wb || !d) { flash(req, 'error', req.t('กรอกข้อมูลให้ครบและถูกต้อง')); return back(req, res); }
   try {
     if (req.body.id) {
@@ -199,7 +202,7 @@ app.get('/upload/template', auth, async (req, res) => {
 });
 
 require('./imports')(app, { db, auth, upload });
-require('./checker')(app, { db, auth });
+checker(app, { db, auth });
 appAuth.routes(app, { db, auth });
 
 // ---------- users (admin) ----------
