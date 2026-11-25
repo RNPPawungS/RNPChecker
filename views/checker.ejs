@@ -143,7 +143,8 @@
     var pv = out.querySelector('.rprev');
     if (pt) { if (pv) pv.innerHTML = pt; else out.insertAdjacentHTML('beforeend', '<div class="rprev">' + pt + '</div>'); }
   }
-  function strip(v) { return String(v || '').replace(/\*/g, '').trim(); }
+  // drop Code 39 '*' and Codabar start/stop letters (D3867497060D -> 3867497060), like the server does
+  function strip(v) { var s = String(v || '').replace(/\*/g, '').trim(), m = /^[A-D](\d+)[A-D]$/i.exec(s); return m ? m[1] : s; }
   function post(url, body) {
     return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), credentials: 'same-origin' })
       .then(function (r) { return r.json(); });
