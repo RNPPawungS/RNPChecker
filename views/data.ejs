@@ -1,19 +1,28 @@
 <%- include('_head') %>
 <div class="phead">
   <h1><%= t('จัดการข้อมูล') %></h1>
-  <form method="post" action="/upload" enctype="multipart/form-data" id="upForm">
+  <form method="post" action="/upload" enctype="multipart/form-data" id="upForm" class="row acts">
+    <a class="btn ghost" href="/upload/template" title="<%= t('Template สำหรับ Import: Box No., Waybill No., Operation Date (dd/mm/yyyy)') %>"><%- icon('download') %><%= t('ดาวน์โหลด Template') %></a>
+    <a class="btn ghost" href="/upload"><%- icon('history') %><%= t('ประวัติ Import') %></a>
     <input type="file" name="file" id="upFile" accept=".xlsx,.csv" hidden>
-    <button type="button" class="btn" id="upBtn" title="<%= t('อัปโหลดไฟล์ Excel / CSV') %>"><%- icon('upload') %><span><%= t('อัปโหลดข้อมูล') %></span></button>
+    <button type="button" class="btn" id="upBtn" title="<%= t('Import ไฟล์ Excel / CSV (ถ้า Waybill No. มีอยู่แล้ว ระบบจะอัปเดตทับข้อมูลเดิม)') %>"><%- icon('upload') %><span><%= t('Import ข้อมูล') %></span></button>
   </form>
 </div>
+<div class="flash error" id="upErr" role="alert" hidden></div>
 <form class="card filters" method="get">
   <input name="q" placeholder="<%= t('ค้นหา Box No. / Waybill No.') %>" value="<%= q.q||'' %>">
   <label><%= t('วันที่|from') %> <input class="dp" name="from" placeholder="dd/mm/yyyy" value="<%= q.from||'' %>" autocomplete="off"></label>
   <label><%= t('ถึง') %> <input class="dp" name="to" placeholder="dd/mm/yyyy" value="<%= q.to||'' %>" autocomplete="off"></label>
   <button class="btn"><%= t('ค้นหา') %></button>
   <a class="btn ghost" href="/data"><%= t('ล้าง') %></a>
-  <a class="btn ghost" href="/data/export?<%= new URLSearchParams({q:q.q||'',from:q.from||'',to:q.to||''}) %>"><%= t('ส่งออก Excel') %></a>
+  <button class="btn ghost" id="expBtn" formaction="/data/export"><%- icon('sheet') %><%= t('ส่งออก Excel') %></button>
 </form>
+<dialog id="expDlg"><form method="dialog" class="stack">
+  <h3 class="warnhead"><%- icon('alert') %><%= t('ยืนยันการส่งออก Excel') %></h3>
+  <p><%= t('หากไม่เลือกขอบเขตข้อมูล อาจใช้เวลาประมวลผลนาน') %></p>
+  <p class="muted"><%- t.h('ยังไม่ได้ค้นหาหรือเลือกช่วงวันที่ ระบบจะส่งออกข้อมูลทั้งหมด <b>{n}</b> รายการ', { n: all.toLocaleString() }) %></p>
+  <div class="row"><button class="btn" value="ok"><%= t('ยืนยัน') %></button><button class="btn ghost" value="cancel" autofocus><%= t('ยกเลิก') %></button></div>
+</form></dialog>
 <details class="card add"><summary><%= t('เพิ่มรายการ') %></summary>
   <form method="post" action="/data" class="row">
     <input name="box_no" placeholder="Box No." required>
@@ -50,14 +59,45 @@
   <div class="row"><button class="btn"><%= t('บันทึก') %></button><button type="button" class="btn ghost" onclick="dlg.close()"><%= t('ยกเลิก') %></button></div>
 </form></dialog>
 <script>
+// Import: pick a file -> send it with a progress text -> open the result page
 (function () {
-  var b = document.getElementById('upBtn'), f = document.getElementById('upFile');
+  var b = document.getElementById('upBtn'), f = document.getElementById('upFile'), form = document.getElementById('upForm');
+  var label = b.querySelector('span'), idle = label.textContent, err = document.getElementById('upErr');
   b.addEventListener('click', function () { f.click(); });
   f.addEventListener('change', function () {
     if (!f.files.length) return;
-    b.disabled = true; b.querySelector('span').textContent = <%- t.js('กำลังส่งไฟล์...') %>;
-    document.getElementById('upForm').submit();
+    b.disabled = true; err.hidden = true; label.textContent = <%- t.js('กำลังส่งไฟล์...') %>;
+    if (!window.XMLHttpRequest || !window.FormData) { form.submit(); return; }
+    var x = new XMLHttpRequest();
+    x.open('POST', form.action);
+    x.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+    x.upload.onprogress = function (ev) {
+      if (!ev.lengthComputable) return;
+      var p = Math.round(ev.loaded / ev.total * 100);
+      label.textContent = p < 100 ? <%- t.js('กำลังส่งไฟล์...') %> + ' ' + p + '%' : <%- t.js('กำลังตรวจสอบและบันทึกข้อมูล...') %>;
+    };
+    var fail = function (msg) { err.textContent = msg; err.hidden = false; b.disabled = false; label.textContent = idle; f.value = ''; };
+    x.onload = function () {
+      var d = null; try { d = JSON.parse(x.responseText); } catch (e) {}
+      if (d && d.redirect) location.href = d.redirect;
+      else fail((d && d.error) || <%- t.js('ส่งไฟล์ไม่สำเร็จ กรุณาลองใหม่') %>);
+    };
+    x.onerror = function () { fail(<%- t.js('ส่งไฟล์ไม่สำเร็จ กรุณาลองใหม่') %>); };
+    x.send(new FormData(form));
   });
+})();
+// Export without a search or a date range: ask first, it can take long
+(function () {
+  var f = document.querySelector('form.filters'), b = document.getElementById('expBtn'), d = document.getElementById('expDlg'), go = false;
+  b.addEventListener('click', function (e) {
+    if (go) { go = false; return; }
+    var empty = ['q', 'from', 'to'].every(function (n) { return !f.elements[n].value.trim(); });
+    if (!empty) return;
+    e.preventDefault();
+    if (d.showModal) { d.returnValue = ''; d.showModal(); }
+    else if (confirm(<%- t.js('หากไม่เลือกขอบเขตข้อมูล อาจใช้เวลาประมวลผลนาน') %>)) { go = true; b.click(); }
+  });
+  d.addEventListener('close', function () { if (d.returnValue === 'ok') { go = true; b.click(); } });
 })();
 function edit(r){const f=dlg.querySelector('form');f.id.value=r.id;f.box_no.value=r.b;f.waybill_no.value=r.w;f.operation_date._flatpickr.setDate(r.d, false, 'd/m/Y');dlg.showModal();}
 </script>

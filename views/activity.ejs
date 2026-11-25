@@ -1,0 +1,37 @@
+<%- include('_head') %>
+<div class="phead"><div><h1><%= t('ประวัติการใช้งาน') %></h1><p><%= t('ใครทำอะไรในระบบ เมื่อไร (เห็นเฉพาะผู้ดูแลระบบ)') %></p></div></div>
+<form class="card filters" method="get">
+  <input name="q" placeholder="<%= t('ค้นหา email / เลข / ชื่อไฟล์ / IP') %>" value="<%= q.q||'' %>">
+  <select name="user" aria-label="<%= t('ผู้ใช้') %>">
+    <option value=""><%= t('ผู้ใช้ทั้งหมด') %></option>
+    <% users.forEach(u => { %><option value="<%= u.id %>" <%= String(q.user)===String(u.id) ? 'selected' : '' %>><%= u.email %><%= u.deleted_at ? ' (' + t('ลบแล้ว') + ')' : '' %></option><% }) %>
+  </select>
+  <select name="group" aria-label="<%= t('การกระทำ') %>">
+    <option value=""><%= t('ทุกการกระทำ') %></option>
+    <% Object.entries(GROUPS).forEach(([k, v]) => { %><option value="<%= k %>" <%= q.group===k ? 'selected' : '' %>><%= t(v) %></option><% }) %>
+  </select>
+  <label><%= t('วันที่|from') %> <input class="dp" name="from" placeholder="dd/mm/yyyy" value="<%= q.from||'' %>" autocomplete="off"></label>
+  <label><%= t('ถึง') %> <input class="dp" name="to" placeholder="dd/mm/yyyy" value="<%= q.to||'' %>" autocomplete="off"></label>
+  <button class="btn"><%= t('ค้นหา') %></button>
+  <a class="btn ghost" href="/activity"><%= t('ล้าง') %></a>
+</form>
+<div class="card table">
+<div class="tbar"><span><%- t.h('ทั้งหมด <b>{n}</b> รายการ', { n: total.toLocaleString() }) %></span></div>
+<div class="scroll"><table class="activity">
+<thead><tr><th><%= t('เวลา') %></th><th><%= t('ผู้ใช้') %></th><th><%= t('การกระทำ') %></th><th><%= t('รายละเอียด') %></th></tr></thead>
+<tbody>
+<% rows.forEach(r => { %>
+<tr>
+  <td class="nowrap sm"><%= r.when %></td>
+  <td class="sm"><% if (r.name) { %><b><%= r.name %></b><br><% } %><span class="muted"><%= r.email || '-' %></span></td>
+  <td><span class="tag g-<%= r.group %>"><%= t(r.label) %></span></td>
+  <td class="detail"><%= r.text %><% if (r.ref) { %> <a href="<%= r.ref %>"><%= t('ดูผล') %></a><% } %><% if (r.ip) { %><span class="muted sm ip">IP <%= r.ip %></span><% } %></td>
+</tr>
+<% }) %>
+<% if (!rows.length) { %><tr><td colspan="4" class="muted center"><%= t('ไม่พบข้อมูล') %></td></tr><% } %>
+</tbody></table></div>
+<% if (pages>1) { const p = (n)=>'?'+new URLSearchParams({...q,page:n}); %>
+<div class="pager"><% if (page>1) { %><a href="<%= p(page-1) %>"><%= t('‹ ก่อนหน้า') %></a><% } %><span><%= t('หน้า {page} / {pages}', { page, pages }) %></span><% if (page<pages) { %><a href="<%= p(page+1) %>"><%= t('ถัดไป ›') %></a><% } %></div>
+<% } %>
+</div>
+<%- include('_foot') %>

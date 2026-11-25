@@ -12,6 +12,7 @@ const appAuth = require('./appauth');
 const checker = require('./checker');
 const barcode = require('./barcode');
 const i18n = require('./i18n');
+const activity = require('./activity');
 const { readRows, buildTemplate, toDate } = require('./parse');
 
 const app = express();
@@ -111,16 +112,21 @@ const auth = (req, res, next) => {
   next();
 };
 const admin = (req, res, next) => (req.user?.role === 'admin' ? next() : res.status(403).send('Forbidden'));
+const { log } = activity(app, { db, auth, admin, dmy }); // admin menu "ประวัติการใช้งาน" (/activity)
 
 // ---------- auth ----------
 app.get('/login', (req, res) => (req.user ? res.redirect('/') : res.render('login')));
 app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'], prompt: 'select_account' }));
 app.get('/auth/google/callback', passport.authenticate('google', { failureRedirect: '/login', keepSessionInfo: true }), (req, res) => {
+  log(req, 'login', req.session.returnTo === '/app/login' ? { app: 1 } : null);
   const to = req.session.returnTo === '/app/login' ? '/app/login' : '/';
   delete req.session.returnTo;
   res.redirect(to);
 });
-app.post('/logout', (req, res, next) => req.logout((e) => (e ? next(e) : res.redirect('/login'))));
+app.post('/logout', (req, res, next) => {
+  if (req.user) log(req, 'logout');
+  req.logout((e) => (e ? next(e) : res.redirect('/login')));
+});
 
 // ---------- home / menu ----------
 app.get('/', auth, async (req, res) => {
@@ -148,12 +154,15 @@ app.get('/data', auth, async (req, res) => {
   const [rows] = await db.query(`SELECT p.*, u.email updated_email FROM packings p LEFT JOIN users u ON u.id=COALESCE(p.updated_by,p.created_by)
     ${f.sql.replace(/(box_no|waybill_no|operation_date)/g, 'p.$1')} ORDER BY p.operation_date DESC, p.box_no, p.waybill_no LIMIT ? OFFSET ?`,
     [...f.args, per, (page - 1) * per]);
-  res.render('data', { rows, total, page, pages: Math.max(1, Math.ceil(total / per)), q: req.query });
+  const all = f.sql ? (await db.query('SELECT COUNT(*) n FROM packings'))[0][0].n : total; // for the "export everything?" warning
+  res.render('data', { rows, total, all, page, pages: Math.max(1, Math.ceil(total / per)), q: req.query });
 });
 
 app.get('/data/export', auth, async (req, res) => {
   const f = filters(req.query);
   const [rows] = await db.query(`SELECT box_no, waybill_no, operation_date FROM packings ${f.sql} ORDER BY operation_date DESC, box_no, waybill_no`, f.args);
+  const scope = { q: String(req.query.q || '').trim().slice(0, 64), from: toDate(req.query.from) ? req.query.from : '', to: toDate(req.query.to) ? req.query.to : '' };
+  log(req, 'export', { n: rows.length, ...Object.fromEntries(Object.entries(scope).filter(([, v]) => v)) });
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('Packing');
   ws.columns = [{ header: 'Box No.', key: 'box_no', width: 20 }, { header: 'Waybill No.', key: 'waybill_no', width: 25 }, { header: 'Operation Date', key: 'operation_date', width: 18, style: { numFmt: 'dd/mm/yyyy' } }];
@@ -170,11 +179,18 @@ app.post('/data', auth, async (req, res) => {
   if (!box || !wb || !d) { flash(req, 'error', req.t('กรอกข้อมูลให้ครบและถูกต้อง')); return back(req, res); }
   try {
     if (req.body.id) {
+      const [[old]] = await db.query('SELECT box_no, waybill_no, operation_date FROM packings WHERE id=?', [req.body.id]);
       await db.query('UPDATE packings SET box_no=?, waybill_no=?, operation_date=?, updated_by=? WHERE id=?', [box, wb, d, req.user.id, req.body.id]);
       flash(req, 'ok', req.t('แก้ไข {wb} แล้ว', { wb }));
+      if (old) {
+        const changes = [['Box No.', old.box_no, box], ['Waybill No.', old.waybill_no, wb], ['Operation Date', dmy(old.operation_date), dmy(d)]]
+          .filter(([, a, b]) => a !== b).map(([k, a, b]) => `${k} ${a} → ${b}`);
+        log(req, 'data_edit', { wb: old.waybill_no, changes });
+      }
     } else {
       await db.query('INSERT INTO packings (box_no,waybill_no,operation_date,created_by) VALUES (?,?,?,?)', [box, wb, d, req.user.id]);
       flash(req, 'ok', req.t('เพิ่ม {wb} แล้ว', { wb }));
+      log(req, 'data_add', { box, wb, date: dmy(d) });
     }
   } catch (e) {
     flash(req, 'error', e.code === 'ER_DUP_ENTRY' ? req.t('Waybill No. {wb} มีอยู่แล้ว', { wb }) : e.message);
@@ -185,8 +201,10 @@ app.post('/data', auth, async (req, res) => {
 app.post('/data/delete', auth, async (req, res) => {
   const ids = [].concat(req.body.id || []).map(Number).filter(Boolean);
   if (ids.length) {
+    const [gone] = await db.query('SELECT waybill_no FROM packings WHERE id IN (?) ORDER BY waybill_no LIMIT 20', [ids]);
     const [r] = await db.query('DELETE FROM packings WHERE id IN (?)', [ids]);
     flash(req, 'ok', req.t('ลบ {n} รายการแล้ว', { n: r.affectedRows }));
+    if (r.affectedRows) log(req, 'data_delete', { n: r.affectedRows, wbs: gone.map((g) => g.waybill_no) });
   }
   back(req, res);
 });
@@ -197,14 +215,15 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 
 
 app.get('/upload/template', auth, async (req, res) => {
   const buf = await buildTemplate(req.t);
+  log(req, 'template');
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', 'attachment; filename="packing-template.xlsx"');
   res.send(Buffer.from(buf));
 });
 
-require('./imports')(app, { db, auth, upload });
+require('./imports')(app, { db, auth, upload, log, flash });
 checker(app, { db, auth });
-appAuth.routes(app, { db, auth });
+appAuth.routes(app, { db, auth, log });
 
 // ---------- users (admin) ----------
 app.get('/users', auth, admin, async (req, res) => {
@@ -223,6 +242,7 @@ app.post('/users', auth, admin, async (req, res) => {
   const [[old]] = await db.query('SELECT id FROM users WHERE email=? AND deleted_at IS NOT NULL ORDER BY id DESC LIMIT 1', [email]);
   if (old) await db.query("UPDATE users SET deleted_at=NULL, status='active', role=? WHERE id=?", [role, old.id]);
   else await db.query("INSERT INTO users (email, role, status) VALUES (?, ?, 'active')", [email, role]);
+  log(req, 'user_add', { email, role });
   flash(req, 'ok', req.t('เพิ่ม {email} แล้ว เข้าสู่ระบบด้วย Google ได้ทันที', { email }));
   res.redirect('/users');
 });
@@ -230,8 +250,14 @@ app.post('/users/:id(\\d+)', auth, admin, async (req, res) => {
   const id = Number(req.params.id);
   if (id === req.user.id) { flash(req, 'error', req.t('แก้ไขสิทธิ์ตัวเองไม่ได้')); return res.redirect('/users'); }
   const { status, role } = req.body;
+  const [[u]] = await db.query('SELECT email, status, role FROM users WHERE id=? AND deleted_at IS NULL', [id]);
   if (['pending', 'active', 'disabled'].includes(status)) await db.query('UPDATE users SET status=? WHERE id=? AND deleted_at IS NULL', [status, id]);
   if (['admin', 'user'].includes(role)) await db.query('UPDATE users SET role=? WHERE id=? AND deleted_at IS NULL', [role, id]);
+  const ch = {
+    status: ['pending', 'active', 'disabled'].includes(status) && status !== u?.status ? status : undefined,
+    role: ['admin', 'user'].includes(role) && role !== u?.role ? role : undefined,
+  };
+  if (u && (ch.status || ch.role)) log(req, 'user_update', { email: u.email, ...ch });
   flash(req, 'ok', req.t('บันทึกแล้ว'));
   res.redirect('/users');
 });
@@ -244,6 +270,7 @@ app.post('/users/:id(\\d+)/delete', auth, admin, async (req, res) => {
   if (!u) { flash(req, 'error', req.t('ไม่พบผู้ใช้นี้')); return res.redirect('/users'); }
   if (!u.google_id) await db.query('DELETE FROM users WHERE id=?', [id]);
   else await db.query("UPDATE users SET deleted_at=NOW(), status='disabled' WHERE id=?", [id]);
+  log(req, 'user_delete', { email: u.email });
   flash(req, 'ok', req.t('ลบ {email} แล้ว', { email: u.email }));
   res.redirect('/users');
 });

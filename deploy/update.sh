@@ -26,6 +26,7 @@ migrate() { # $1 = table that the migration creates, $2 = file
 }
 migrate upload_rows migrate-002-import-detail.sql
 migrate check_logs migrate-003-checker.sql
+migrate activity_logs migrate-005-activity.sql
 migrate_col() { # $1 = table, $2 = column that the migration adds, $3 = file
   if [ "$(mysql -N packing -e "SHOW COLUMNS FROM $1 LIKE '$2'")" = "" ]; then mysql packing < "$APP/sql/$3" && echo "$3 applied"; else echo "$3 already applied"; fi
 }

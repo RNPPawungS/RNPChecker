@@ -15,7 +15,7 @@ function dmy(v) {
   return m ? `${m[3]}/${m[2]}/${m[1]}${m[4] ? ' ' + m[4] : ''}` : (v ?? '');
 }
 
-module.exports = function registerImports(app, { db, auth, upload }) {
+module.exports = function registerImports(app, { db, auth, upload, log, flash }) {
   const history = async () => {
     const [rows] = await db.query(`SELECT up.*, u.email FROM uploads up JOIN users u ON u.id=up.user_id ORDER BY up.id DESC LIMIT 50`);
     return rows;
@@ -25,8 +25,21 @@ module.exports = function registerImports(app, { db, auth, upload }) {
     res.render('upload', { history: await history() });
   });
 
-  app.post('/upload', auth, upload.single('file'), async (req, res) => {
-    const fail = async (msg) => { res.locals.flash = { type: 'error', msg: req.t(msg) }; res.render('upload', { history: await history() }); };
+  // Import from the data page ("Import ข้อมูล"). The page sends the file with XMLHttpRequest (progress bar) and gets JSON back;
+  // a plain form post gets a redirect instead.
+  const single = upload.single('file');
+  app.post('/upload', auth, (req, res, next) => single(req, res, (e) => {
+    if (!e) return next();
+    req.uploadError = e.code === 'LIMIT_FILE_SIZE' ? 'ไฟล์ใหญ่เกิน 20 MB' : 'อ่านไฟล์ไม่ได้: ' + e.message;
+    next();
+  }), async (req, res) => {
+    const xhr = req.get('X-Requested-With') === 'XMLHttpRequest';
+    const go = (url) => (xhr ? res.json({ redirect: url }) : res.redirect(url));
+    const fail = (msg) => {
+      if (xhr) return res.status(400).json({ error: req.t(msg) });
+      flash(req, 'error', req.t(msg)); res.redirect('/data');
+    };
+    if (req.uploadError) return fail(req.uploadError);
     if (!req.file) return fail('กรุณาเลือกไฟล์ .xlsx หรือ .csv');
     const started = Date.now();
     const filename = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
@@ -35,9 +48,13 @@ module.exports = function registerImports(app, { db, auth, upload }) {
     try { rows = await readRows(req.file.buffer, filename); } catch (e) {
       const [r] = await db.query(`INSERT INTO uploads (user_id, filename, file_size, status, message, duration_ms) VALUES (?,?,?,?,?,?)`,
         [req.user.id, filename, req.file.size, 'failed', ('อ่านไฟล์ไม่ได้: ' + e.message).slice(0, 500), Date.now() - started]);
-      return res.redirect(`/upload/${r.insertId}`);
+      log(req, 'import', { file: filename, failed: 1, msg: ('อ่านไฟล์ไม่ได้: ' + e.message).slice(0, 200) }, `/upload/${r.insertId}`);
+      return go(`/upload/${r.insertId}`);
     }
-    if (!rows.length) return fail('ไม่พบข้อมูลในไฟล์ (มีแต่หัวคอลัมน์)');
+    if (!rows.length) {
+      log(req, 'import', { file: filename, failed: 1, msg: 'ไม่พบข้อมูลในไฟล์ (มีแต่หัวคอลัมน์)' });
+      return fail('ไม่พบข้อมูลในไฟล์ (มีแต่หัวคอลัมน์)');
+    }
 
     // duplicates inside the same file
     const seen = new Map();
@@ -89,15 +106,17 @@ module.exports = function registerImports(app, { db, auth, upload }) {
       await conn.query(`UPDATE uploads SET inserted_rows=?, updated_rows=?, unchanged_rows=?, error_rows=?, status='done', duration_ms=? WHERE id=?`,
         [n('inserted'), n('updated'), n('unchanged'), n('error'), Date.now() - started, uploadId]);
       await conn.commit();
+      log(req, 'import', { file: filename, n: rows.length, inserted: n('inserted'), updated: n('updated'), unchanged: n('unchanged'), error: n('error') }, `/upload/${uploadId}`);
     } catch (e) {
       await conn.rollback();
       conn.release();
       const [r] = await db.query(`INSERT INTO uploads (user_id, filename, file_size, total_rows, status, message, duration_ms) VALUES (?,?,?,?,?,?,?)`,
         [req.user.id, filename, req.file.size, rows.length, 'failed', ('บันทึกไม่สำเร็จ ไม่มีข้อมูลใดถูกบันทึก: ' + e.message).slice(0, 500), Date.now() - started]);
-      return res.redirect(`/upload/${r.insertId}`);
+      log(req, 'import', { file: filename, failed: 1, msg: ('บันทึกไม่สำเร็จ ไม่มีข้อมูลใดถูกบันทึก: ' + e.message).slice(0, 200) }, `/upload/${r.insertId}`);
+      return go(`/upload/${r.insertId}`);
     }
     conn.release();
-    res.redirect(`/upload/${uploadId}`);
+    go(`/upload/${uploadId}`);
   });
 
   const filterSql = (q) => {

@@ -1,0 +1,121 @@
+// Activity history (admin menu "ประวัติการใช้งาน"): who did what and when.
+// Web actions are written to activity_logs by log(); Checker checks are already in check_logs and are shown with them.
+const { toDate } = require('./parse');
+
+// action -> [group, label]. Labels are Thai source text for t().
+const ACTIONS = {
+  login: ['auth', 'เข้าสู่ระบบ'],
+  logout: ['auth', 'ออกจากระบบ'],
+  app_login: ['auth', 'เข้าสู่ระบบแอป Android'],
+  data_add: ['data', 'เพิ่มรายการ'],
+  data_edit: ['data', 'แก้ไขรายการ'],
+  data_delete: ['data', 'ลบรายการ'],
+  import: ['file', 'Import ข้อมูล'],
+  export: ['file', 'ส่งออก Excel'],
+  template: ['file', 'ดาวน์โหลด Template'],
+  user_add: ['users', 'เพิ่มผู้ใช้'],
+  user_update: ['users', 'แก้ไขผู้ใช้'],
+  user_delete: ['users', 'ลบผู้ใช้'],
+  check_ref: ['check', 'Ref Check'],
+  check_cross: ['check', 'Cross Ref Check'],
+};
+const GROUPS = { auth: 'เข้าสู่ระบบ / ออกจากระบบ', data: 'เพิ่ม / แก้ไข / ลบข้อมูล', file: 'Import / Export', users: 'จัดการผู้ใช้', check: 'Checker' };
+const ROLE = { admin: 'ผู้ดูแล', user: 'ผู้ใช้' };
+const STATUS = { pending: 'รออนุมัติ', active: 'ใช้งาน', disabled: 'ระงับ|status' };
+const RESULT = { found: 'พบ', match: 'ตรง', mismatch: 'ไม่ตรง', not_found: 'ไม่พบ' };
+const PER_PAGE = 50;
+
+module.exports = function activity(app, { db, auth, admin, dmy }) {
+  /** Records an action. user defaults to req.user (pass it when there is no session yet, e.g. the app token). Never throws. */
+  const log = (req, action, meta, ref, user = req.user) =>
+    db.query('INSERT INTO activity_logs (user_id, email, action, meta, ref, ip) VALUES (?,?,?,?,?,?)',
+      [user?.id ?? null, user?.email ?? null, action, meta ? JSON.stringify(meta) : null, ref || null, String(req.ip || '').slice(0, 45) || null])
+      .catch((e) => console.error('activity log', action, e.message));
+
+  /** One line of detail for a row, in the page language. */
+  function describe(r, t) {
+    let m = {};
+    try { m = r.meta ? JSON.parse(r.meta) : {}; } catch (e) { m = {}; }
+    const n = (v) => Number(v || 0).toLocaleString();
+    switch (r.action) {
+      case 'data_add': return `Box No. ${m.box} · Waybill No. ${m.wb} · ${m.date}`;
+      case 'data_edit': return `Waybill No. ${m.wb}` + (m.changes?.length ? ': ' + m.changes.join(', ') : ` (${t('ไม่มีการเปลี่ยนแปลง')})`);
+      case 'data_delete': return t('{n} รายการ', { n: n(m.n) }) + (m.wbs?.length ? ': ' + m.wbs.join(', ') + (m.n > m.wbs.length ? ' …' : '') : '');
+      case 'export': {
+        const scope = [];
+        if (m.q) scope.push(t('ค้นหา "{q}"', { q: m.q }));
+        if (m.from || m.to) scope.push(`${m.from || '…'} – ${m.to || '…'}`);
+        return t('{n} รายการ', { n: n(m.n) }) + ' · ' + (scope.length ? scope.join(' · ') : t('ไม่ได้เลือกขอบเขตข้อมูล (ทั้งหมด)'));
+      }
+      case 'import':
+        if (m.failed) return `${m.file || ''} · ${t('ล้มเหลว')}` + (m.msg ? `: ${t(m.msg)}` : '');
+        return `${m.file} · ` + t('ทั้งหมด {n} · เพิ่มใหม่ {a} · อัปเดต {u} · ไม่เปลี่ยน {s} · ผิดพลาด {e}',
+          { n: n(m.n), a: n(m.inserted), u: n(m.updated), s: n(m.unchanged), e: n(m.error) });
+      case 'user_add': return `${m.email} (${t(ROLE[m.role] || m.role)})`;
+      case 'user_update': return `${m.email}: ` + [m.status && `${t('สถานะ')} → ${t(STATUS[m.status] || m.status)}`,
+        m.role && `${t('สิทธิ์')} → ${t(ROLE[m.role] || m.role)}`].filter(Boolean).join(', ');
+      case 'user_delete': return m.email || '';
+      case 'check_ref': return `${r.in1} · ${t(RESULT[r.result] || r.result)}` + (r.detail ? ` · ${t(r.detail)}` : '');
+      case 'check_cross': return `${r.corder === 'bw' ? 'Box → Waybill' : 'Waybill → Box'}: ${r.in1} / ${r.in2} · ${t(RESULT[r.result] || r.result)}`;
+      default: return '';
+    }
+  }
+
+  app.get('/activity', auth, admin, async (req, res) => {
+    const q = req.query;
+    const page = Math.max(1, parseInt(q.page, 10) || 1);
+    const group = GROUPS[q.group] ? q.group : '';
+    const userId = parseInt(q.user, 10) || null;
+    const from = toDate(q.from); const to = toDate(q.to);
+    const text = String(q.q || '').trim().slice(0, 100);
+
+    // the same filters on both tables
+    const part = (alias, isCheck) => {
+      const w = []; const a = [];
+      if (userId) { w.push(`${alias}.user_id=?`); a.push(userId); }
+      if (from) { w.push(`${alias}.created_at >= ?`); a.push(from); }
+      if (to) { w.push(`${alias}.created_at < DATE_ADD(?, INTERVAL 1 DAY)`); a.push(to); }
+      if (!isCheck && group) { w.push(`${alias}.action IN (?)`); a.push(Object.keys(ACTIONS).filter((k) => ACTIONS[k][0] === group)); }
+      if (text) {
+        const like = `%${text}%`;
+        if (isCheck) { w.push('(c.input1 LIKE ? OR c.input2 LIKE ? OR u.email LIKE ? OR u.name LIKE ?)'); a.push(like, like, like, like); }
+        else { w.push('(a.meta LIKE ? OR a.email LIKE ? OR u.email LIKE ? OR u.name LIKE ? OR a.ip LIKE ?)'); a.push(like, like, like, like, like); }
+      }
+      return { sql: w.length ? 'WHERE ' + w.join(' AND ') : '', args: a };
+    };
+    const useA = group !== 'check'; const useC = !group || group === 'check';
+    const pa = part('a', false); const pc = part('c', true);
+    const fromA = 'FROM activity_logs a LEFT JOIN users u ON u.id=a.user_id';
+    const fromC = 'FROM check_logs c LEFT JOIN users u ON u.id=c.user_id';
+
+    let total = 0;
+    if (useA) { const [[{ n }]] = await db.query(`SELECT COUNT(*) n ${fromA} ${pa.sql}`, pa.args); total += n; }
+    if (useC) { const [[{ n }]] = await db.query(`SELECT COUNT(*) n ${fromC} ${pc.sql}`, pc.args); total += n; }
+
+    // newest first across both tables: each side returns at most the rows up to this page, then they are merged
+    const upto = page * PER_PAGE;
+    const parts = []; const args = [];
+    if (useA) {
+      parts.push(`(SELECT 'a' src, a.id, a.user_id, COALESCE(u.email, a.email) email, u.name, a.action, a.meta, a.ref, a.ip, a.created_at,
+        NULL in1, NULL in2, NULL result, NULL detail, NULL corder ${fromA} ${pa.sql} ORDER BY a.created_at DESC, a.id DESC LIMIT ?)`);
+      args.push(...pa.args, upto);
+    }
+    if (useC) {
+      parts.push(`(SELECT 'c' src, c.id, c.user_id, u.email, u.name, CONCAT('check_', c.mode) action, NULL meta, NULL ref, NULL ip, c.created_at,
+        c.input1 in1, c.input2 in2, c.result, c.detail, c.check_order corder ${fromC} ${pc.sql} ORDER BY c.created_at DESC, c.id DESC LIMIT ?)`);
+      args.push(...pc.args, upto);
+    }
+    const [rows] = await db.query(`SELECT * FROM (${parts.join(' UNION ALL ')}) x ORDER BY created_at DESC, src, id DESC LIMIT ? OFFSET ?`,
+      [...args, PER_PAGE, (page - 1) * PER_PAGE]);
+    const [users] = await db.query('SELECT id, email, name, deleted_at FROM users ORDER BY deleted_at IS NOT NULL, email');
+
+    res.render('activity', {
+      q: { ...q, group, q: text }, total, page, pages: Math.max(1, Math.ceil(total / PER_PAGE)), users, GROUPS,
+      rows: rows.map((r) => ({ ...r, when: dmy(r.created_at), group: (ACTIONS[r.action] || ['other'])[0], label: (ACTIONS[r.action] || [, r.action])[1], text: describe(r, req.t) })),
+    });
+  });
+
+  return { log };
+};
+
+module.exports.ACTIONS = ACTIONS;

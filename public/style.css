@@ -52,7 +52,13 @@ nav a.on{background:var(--pri-50);color:var(--pri);font-weight:600}nav a.on svg{
 /* ---------- page head ---------- */
 .phead{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:20px}
 .phead h1{margin:0}.phead p{margin:4px 0 0;color:var(--muted)}
-.phead form{margin:0}.phead .btn svg{width:17px;height:17px;flex:none}
+.phead form{margin:0}.phead .btn svg,.filters .btn svg{width:17px;height:17px;flex:none}
+.phead .acts{gap:8px}
+.warnhead{display:flex;align-items:center;gap:10px}.warnhead svg{width:24px;height:24px;color:var(--warn);flex:none}
+/* activity history */
+.tag.g-auth{background:var(--info-50);color:var(--info)}.tag.g-data{background:var(--warn-50);color:var(--warn)}
+.tag.g-file{background:var(--ok-50);color:var(--ok)}.tag.g-users{background:#f5f3ff;color:#6d28d9}.tag.g-check,.tag.g-other{background:#f1f5f9;color:#475569}
+table.activity td.detail{min-width:280px;word-break:break-word}table.activity .ip{display:block}
 
 /* ---------- cards / layout ---------- */
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px;margin-bottom:18px;box-shadow:var(--sh)}

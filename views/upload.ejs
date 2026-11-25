@@ -1,25 +1,9 @@
 <%- include('_head') %>
-<h1><%= t('อัปโหลดเอกสาร') %></h1>
-<div class="grid2">
-  <div class="card">
-    <h3><span class="step">1</span><%= t('ดาวน์โหลด template') %></h3>
-    <p class="muted"><%- t.h('ไฟล์ Excel มีคอลัมน์ <b>Box No.</b>, <b>Waybill No.</b>, <b>Operation Date</b> (dd/mm/yyyy)') %></p>
-    <a class="btn" href="/upload/template">⬇️ <%= t('ดาวน์โหลด template (.xlsx)') %></a>
-  </div>
-  <div class="card">
-    <h3><span class="step">2</span><%= t('อัปโหลดไฟล์') %></h3>
-    <form method="post" action="/upload" enctype="multipart/form-data" class="stack" id="upForm">
-      <input type="file" name="file" accept=".xlsx,.csv" required>
-      <p class="muted sm"><%= t('รองรับ .xlsx และ .csv · ถ้า Waybill No. มีอยู่แล้ว ระบบจะอัปเดตทับข้อมูลเดิม · หลังอัปโหลดจะแสดงผลรายละเอียดทีละแถว') %></p>
-      <button class="btn" id="upBtn">⬆️ <%= t('อัปโหลด') %></button>
-      <div class="progress" id="upProg" hidden><div class="bar"><span></span></div><span class="sm muted" id="upTxt"><%= t('กำลังส่งไฟล์...') %></span></div>
-    </form>
-  </div>
-</div>
+<p><a href="/data"><%= t('‹ กลับไปหน้าจัดการข้อมูล') %></a></p>
+<div class="phead"><div><h1><%= t('ประวัติ Import') %></h1><p><%= t('Import ไฟล์ใหม่ได้ที่ปุ่ม "Import ข้อมูล" ในหน้าจัดการข้อมูล') %></p></div></div>
 <div class="card table">
-<h3><%= t('ประวัติการอัปโหลด') %></h3>
 <div class="scroll"><table>
-<thead><tr><th>#</th><th><%= t('เวลา') %></th><th><%= t('ไฟล์') %></th><th><%= t('ผู้อัปโหลด') %></th><th><%= t('สถานะ') %></th><th class="num"><%= t('ทั้งหมด') %></th><th class="num"><%= t('เพิ่มใหม่') %></th><th class="num"><%= t('อัปเดต') %></th><th class="num"><%= t('ไม่เปลี่ยน') %></th><th class="num"><%= t('ผิดพลาด') %></th><th></th></tr></thead><tbody>
+<thead><tr><th>#</th><th><%= t('เวลา') %></th><th><%= t('ไฟล์') %></th><th><%= t('ผู้ Import') %></th><th><%= t('สถานะ') %></th><th class="num"><%= t('ทั้งหมด') %></th><th class="num"><%= t('เพิ่มใหม่') %></th><th class="num"><%= t('อัปเดต') %></th><th class="num"><%= t('ไม่เปลี่ยน') %></th><th class="num"><%= t('ผิดพลาด') %></th><th></th></tr></thead><tbody>
 <% history.forEach(h => { %><tr>
   <td class="muted"><%= h.id %></td>
   <td class="nowrap"><%= dmy(h.created_at) %></td><td><%= h.filename %></td><td class="sm"><%= h.email %></td>
@@ -27,27 +11,6 @@
   <td class="num"><%= h.total_rows %></td><td class="num ok"><%= h.inserted_rows %></td><td class="num"><%= h.updated_rows %></td><td class="num muted"><%= h.unchanged_rows ?? 0 %></td><td class="num <%= h.error_rows ? 'err' : '' %>"><%= h.error_rows %></td>
   <td><a class="btn ghost sm" href="/upload/<%= h.id %>"><%= t('ดูรายละเอียด') %></a></td>
 </tr><% }) %>
-<% if (!history.length) { %><tr><td colspan="11" class="muted center"><%= t('ยังไม่มีการอัปโหลด') %></td></tr><% } %>
+<% if (!history.length) { %><tr><td colspan="11" class="muted center"><%= t('ยังไม่มีการ Import') %></td></tr><% } %>
 </tbody></table></div></div>
-<script>
-(function () {
-  var f = document.getElementById('upForm'); if (!f) return;
-  f.addEventListener('submit', function (e) {
-    if (!window.XMLHttpRequest || !window.FormData) return;
-    e.preventDefault();
-    var prog = document.getElementById('upProg'), bar = prog.querySelector('.bar span'), txt = document.getElementById('upTxt');
-    document.getElementById('upBtn').disabled = true; prog.hidden = false;
-    var x = new XMLHttpRequest();
-    x.open('POST', f.action);
-    x.upload.onprogress = function (ev) {
-      if (!ev.lengthComputable) return;
-      var p = Math.round(ev.loaded / ev.total * 100); bar.style.width = p + '%';
-      txt.textContent = p < 100 ? <%- t.js('กำลังส่งไฟล์...') %> + ' ' + p + '%' : <%- t.js('กำลังตรวจสอบและบันทึกข้อมูล...') %>;
-    };
-    x.onload = function () { if (x.responseURL && x.responseURL !== location.href) location.href = x.responseURL; else { document.open(); document.write(x.responseText); document.close(); } };
-    x.onerror = function () { txt.textContent = <%- t.js('ส่งไฟล์ไม่สำเร็จ กรุณาลองใหม่') %>; document.getElementById('upBtn').disabled = false; };
-    x.send(new FormData(f));
-  });
-})();
-</script>
 <%- include('_foot') %>

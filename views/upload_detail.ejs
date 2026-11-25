@@ -1,10 +1,10 @@
 <%- include('_head') %>
-<p><a href="/upload"><%= t('‹ กลับไปหน้าอัปโหลด') %></a></p>
+<p><a href="/data"><%= t('‹ กลับไปหน้าจัดการข้อมูล') %></a> · <a href="/upload"><%= t('ประวัติ Import') %></a></p>
 <h1><%= t('ผลการ import #{id}', { id: up.id }) %></h1>
 <div class="card">
   <div class="meta">
     <div><span><%= t('ไฟล์') %></span><b><%= up.filename %></b></div>
-    <div><span><%= t('ผู้อัปโหลด') %></span><b><%= up.email %></b></div>
+    <div><span><%= t('ผู้ Import') %></span><b><%= up.email %></b></div>
     <div><span><%= t('เวลา') %></span><b><%= dmy(up.created_at) %></b></div>
     <div><span><%= t('ขนาดไฟล์') %></span><b><%= up.file_size ? (up.file_size/1024).toFixed(1) + ' KB' : '-' %></b></div>
     <div><span><%= t('ใช้เวลา') %></span><b><%= up.duration_ms != null ? t('{s} วินาที', { s: (up.duration_ms/1000).toFixed(2) }) : '-' %></b></div>

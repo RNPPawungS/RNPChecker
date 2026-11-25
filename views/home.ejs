@@ -12,10 +12,10 @@
 <p class="section-title"><%= t('เมนู') %></p>
 <div class="menu">
   <% const go = '<svg class="go" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>'; %>
-  <a class="card tile" href="/data"><span class="ic"><%- icon('data') %></span><div><b><%= t('จัดการข้อมูล') %></b><span><%= t('ดู ค้นหา แก้ไข ลบ Box No. / Waybill No. / Operation Date') %></span></div><%- go %></a>
+  <a class="card tile" href="/data"><span class="ic"><%- icon('data') %></span><div><b><%= t('จัดการข้อมูล') %></b><span><%= t('ดู ค้นหา แก้ไข ลบ Import และส่งออก Box No. / Waybill No. / Operation Date') %></span></div><%- go %></a>
   <a class="card tile" href="/checker"><span class="ic"><%- icon('check') %></span><div><b>Checker</b><span><%= t('Ref Check หาเลขอ้างอิง และ Cross Ref Check ตรวจคู่ Waybill / Box') %></span></div><%- go %></a>
   <a class="card tile" href="/app/pair"><span class="ic"><%- icon('phone') %></span><div><b><%= t('แอป Android (Checker)') %></b><span><%= t('ดาวน์โหลดแอปสำหรับเครื่อง handheld และสแกน QR เพื่อเข้าสู่ระบบ') %></span></div><%- go %></a>
-  <a class="card tile" href="/upload"><span class="ic"><%- icon('upload') %></span><div><b><%= t('อัปโหลดเอกสาร') %></b><span><%= t('ดาวน์โหลด template และอัปโหลดไฟล์ Excel / CSV') %></span></div><%- go %></a>
-  <% if (user.role==='admin') { %><a class="card tile" href="/users"><span class="ic"><%- icon('users') %></span><div><b><%= t('ผู้ใช้งาน') %></b><span><%= t('อนุมัติและกำหนดสิทธิ์ผู้ใช้') %></span></div><%- go %></a><% } %>
+  <% if (user.role==='admin') { %><a class="card tile" href="/users"><span class="ic"><%- icon('users') %></span><div><b><%= t('ผู้ใช้งาน') %></b><span><%= t('อนุมัติและกำหนดสิทธิ์ผู้ใช้') %></span></div><%- go %></a>
+  <a class="card tile" href="/activity"><span class="ic"><%- icon('history') %></span><div><b><%= t('ประวัติการใช้งาน') %></b><span><%= t('ใครทำอะไรในระบบ เมื่อไร') %></span></div><%- go %></a><% } %>
 </div>
 <%- include('_foot') %>

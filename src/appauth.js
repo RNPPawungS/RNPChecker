@@ -46,7 +46,7 @@ function bearer(db) {
   };
 }
 
-function routes(app, { db, auth }) {
+function routes(app, { db, auth, log }) {
   const json = express.json({ limit: '2kb' });
 
   // page with the pairing QR (scan it with the handheld) + APK download
@@ -77,6 +77,7 @@ function routes(app, { db, auth }) {
     if (!p) return res.status(400).json({ error: 'QR หมดอายุหรือไม่ถูกต้อง กรุณาเปิดหน้า "เชื่อมแอป Android" ใหม่', code: 'pair' });
     const [[u]] = await db.query('SELECT id, email, name, role, status FROM users WHERE id=? AND deleted_at IS NULL', [p.uid]);
     if (!u || u.status !== 'active') return res.status(403).json({ error: 'บัญชีนี้ยังใช้งานไม่ได้', code: 'status' });
+    if (log) log(req, 'app_login', null, null, u);
     res.json({ token: sign('a', u.id, APP_TTL), email: u.email, name: u.name, role: u.role });
   });
 

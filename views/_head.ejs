@@ -1,8 +1,9 @@
 <%
   const active = user && user.status === 'active';
-  const nav = [['/', t('หน้าหลัก'), 'home'], ['/data', t('จัดการข้อมูล'), 'data'], ['/checker', 'Checker', 'check'], ['/upload', t('อัปโหลด'), 'upload']];
-  if (active && user.role === 'admin') nav.push(['/users', t('ผู้ใช้งาน'), 'users']);
-  const on = (h) => (h === '/' ? path === '/' : path.startsWith(h));
+  const nav = [['/', t('หน้าหลัก'), 'home'], ['/data', t('จัดการข้อมูล'), 'data'], ['/checker', 'Checker', 'check']];
+  if (active && user.role === 'admin') nav.push(['/users', t('ผู้ใช้งาน'), 'users'], ['/activity', t('ประวัติการใช้งาน'), 'history']);
+  // import results (/upload/...) are part of "จัดการข้อมูล"
+  const on = (h) => (h === '/' ? path === '/' : path.startsWith(h) || (h === '/data' && path.startsWith('/upload')));
   const langs = [['th', 'ภาษาไทย'], ['en', 'English']];
 %><!doctype html>
 <html lang="<%= lang %>"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
