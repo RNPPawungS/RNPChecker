@@ -71,8 +71,8 @@ final class Scan {
     // Scanners type through the active keyboard layout; with Thai (Kedmanee) the code arrives as Thai characters.
     private static final Map<Character, Character> TH = new HashMap<>();
     static {
-        String th = "ๅ/-ภถุึคตจ+๑๒๓๔ู฿๕๖๗๘๙ๆไำพะัีรนยฟหกดเ้่าสวงผปแอิืทมใฝ๐\"ฎฑธํ๊ณฯญฤฆฏโฌ็๋ษศ()ฉฮฺ์?";
-        String en = "1234567890!@#$%^&*()_+qwertyuiopasdfghjkl;'zxcvbnm,./QWERTYUIOPASDFGHJKLZXCVBNM";
+        String th = "ๅ/-ภถุึคตจ+๑๒๓๔ู฿๕๖๗๘๙ๆไำพะัีรนยฟหกดเ้่าสวงผปแอิืทมใฝ๐\"ฎฑธํ๊ณฯญฤฆฏโฌ็๋ษศ()ฉฮฺ์?บลฃฐฅซฒฬฦ";
+        String en = "1234567890!@#$%^&*()_+qwertyuiopasdfghjkl;'zxcvbnm,./QWERTYUIOPASDFGHJKLZXCVBNM[]\\{|:<>?";
         for (int i = 0; i < th.length(); i++) TH.put(th.charAt(i), en.charAt(i));
     }
 
@@ -89,11 +89,29 @@ final class Scan {
         return b.toString();
     }
 
-    /** Same cleaning as the server: fix Thai layout, drop control chars and Code 39 '*'. */
+    // Same cleaning as the server (src/barcode.js). A scan can carry characters that are not part of the number:
+    //   Code 39 *3867497060*, ^3867497060^, Codabar D3867497060D (A-D, T N E), AIM IDs ]C0 ]F0 ...,
+    //   control characters (STX/ETX, GS, CR/LF/TAB) and zero-width spaces, also combined (^]F0D3867497060D^).
+    private static final Pattern CONTROL = Pattern.compile("[\\p{Cntrl}\\u200B-\\u200D\\u2060\\uFEFF]");
+    private static final Pattern AIM = Pattern.compile("^\\][A-Za-z][0-9A-Za-z]");
+    private static final Pattern CODABAR = Pattern.compile("^[A-DTNE](\\d+)[A-DTNE]$", Pattern.CASE_INSENSITIVE);
+
+    /** Thai layout fixed and extra characters removed. Codabar letters are kept: the server tries them first. */
     static String clean(String v) {
         if (v == null) return "";
-        String s = fixLayout(v.trim()).replaceAll("[\\p{Cntrl}*]", "").trim();
+        String s = CONTROL.matcher(fixLayout(v.trim())).replaceAll("").trim();
+        for (String prev = null; !s.equals(prev); ) {
+            prev = s;
+            s = AIM.matcher(s).replaceFirst("").replace("*", "").replaceAll("^\\^+|\\^+$", "").trim();
+        }
         return s.length() > 64 ? s.substring(0, 64) : s;
+    }
+
+    /** The number to show: clean(), then without Codabar start/stop letters (D3867497060D -> 3867497060). */
+    static String show(String v) {
+        String s = clean(v);
+        java.util.regex.Matcher m = CODABAR.matcher(s);
+        return m.matches() ? m.group(1) : s;
     }
 
     private static final Pattern PAIR = Pattern.compile("^p\\.[0-9a-z]+\\.[0-9a-z]+\\.[0-9a-f]{40}$");
