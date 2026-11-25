@@ -8,6 +8,7 @@ const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const multer = require('multer');
 const ExcelJS = require('exceljs');
 const db = require('./db');
+const appAuth = require('./appauth');
 const { readRows, buildTemplate, toDate } = require('./parse');
 
 const app = express();
@@ -28,6 +29,7 @@ app.use(session({
 }));
 app.use(passport.initialize());
 app.use(passport.session());
+app.use(appAuth.bearer(db)); // Android Checker app (Authorization: Bearer)
 
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
 const REQUIRE_APPROVAL = process.env.REQUIRE_APPROVAL !== 'false';
@@ -92,7 +94,11 @@ const admin = (req, res, next) => (req.user?.role === 'admin' ? next() : res.sta
 // ---------- auth ----------
 app.get('/login', (req, res) => (req.user ? res.redirect('/') : res.render('login')));
 app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'], prompt: 'select_account' }));
-app.get('/auth/google/callback', passport.authenticate('google', { failureRedirect: '/login' }), (req, res) => res.redirect('/'));
+app.get('/auth/google/callback', passport.authenticate('google', { failureRedirect: '/login', keepSessionInfo: true }), (req, res) => {
+  const to = req.session.returnTo === '/app/login' ? '/app/login' : '/';
+  delete req.session.returnTo;
+  res.redirect(to);
+});
 app.post('/logout', (req, res, next) => req.logout((e) => (e ? next(e) : res.redirect('/login'))));
 
 // ---------- home / menu ----------
@@ -175,6 +181,7 @@ app.get('/upload/template', auth, async (req, res) => {
 
 require('./imports')(app, { db, auth, upload });
 require('./checker')(app, { db, auth });
+appAuth.routes(app, { db, auth });
 
 // ---------- users (admin) ----------
 app.get('/users', auth, admin, async (req, res) => {

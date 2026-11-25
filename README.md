@@ -13,12 +13,15 @@
   - *Cross Ref Check* ตรวจคู่ Waybill/Box เลือกลำดับได้ แสดงผลตรง/ไม่ตรงชัดเจนพร้อมเสียง
   - ตัด `*` (Code 39) และแปลงตัวอักษรที่พิมพ์ผิดเพราะคีย์บอร์ดเป็นภาษาไทยให้อัตโนมัติ มีบันทึกประวัติการตรวจ
 
+- **แอป Android (Checker)** สำหรับเครื่อง handheld ดาวน์โหลดและจับคู่เครื่องได้ที่เมนู "แอป Android (Checker)" รายละเอียดใน [android/README.md](android/README.md)
+
 ## โครงสร้าง
 ```
-src/        app.js (routes หลัก), imports.js (อัปโหลด), checker.js, parse.js (อ่าน Excel/CSV), db.js
+src/        app.js (routes หลัก), imports.js (อัปโหลด), checker.js, appauth.js (login ของแอป Android), parse.js (อ่าน Excel/CSV), db.js
 views/      หน้าเว็บ (EJS)
 public/     CSS
 sql/        schema.sql (ติดตั้งใหม่), migrate-*.sql (อัปเกรดฐานข้อมูลเดิม)
+android/    แอป Android (Checker) + build.sh
 deploy/     install.sh (ติดตั้งครั้งแรก), update.sh (อัปเดต + backup), packing.service, nginx-packing.conf
 ```
 

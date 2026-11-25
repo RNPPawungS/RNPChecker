@@ -78,3 +78,4 @@ select{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:
 #alertFrame.hold{border-width:14px;animation:apulse 1s ease-in-out infinite}
 @keyframes aframe{0%{border-width:18px}100%{border-width:0}}
 @keyframes apulse{0%,100%{border-width:14px;opacity:1}50%{border-width:6px;opacity:.6}}
+.qr svg{width:min(260px,70vw);height:auto;display:block;margin:8px auto}
