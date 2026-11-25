@@ -1,36 +1,15 @@
 // Checker: Ref Check (lookup) and Cross Ref Check (verify a waybill/box pair).
 const express = require('express');
 
-// Barcode scanners type through the active keyboard layout. If Windows is set to Thai (Kedmanee),
-// the scanned code arrives as Thai characters; map them back to the English keys.
-const TH = {
-  'ๅ': '1', '/': '2', '-': '3', 'ภ': '4', 'ถ': '5', 'ุ': '6', 'ึ': '7', 'ค': '8', 'ต': '9', 'จ': '0',
-  '+': '!', '๑': '@', '๒': '#', '๓': '$', '๔': '%', 'ู': '^', '฿': '&', '๕': '*', '๖': '(', '๗': ')', '๘': '_', '๙': '+',
-  'ๆ': 'q', 'ไ': 'w', 'ำ': 'e', 'พ': 'r', 'ะ': 't', 'ั': 'y', 'ี': 'u', 'ร': 'i', 'น': 'o', 'ย': 'p',
-  'ฟ': 'a', 'ห': 's', 'ก': 'd', 'ด': 'f', 'เ': 'g', '้': 'h', '่': 'j', 'า': 'k', 'ส': 'l', 'ว': ';', 'ง': "'",
-  'ผ': 'z', 'ป': 'x', 'แ': 'c', 'อ': 'v', 'ิ': 'b', 'ื': 'n', 'ท': 'm', 'ม': ',', 'ใ': '.', 'ฝ': '/',
-  '๐': 'Q', '"': 'W', 'ฎ': 'E', 'ฑ': 'R', 'ธ': 'T', 'ํ': 'Y', '๊': 'U', 'ณ': 'I', 'ฯ': 'O', 'ญ': 'P',
-  'ฤ': 'A', 'ฆ': 'S', 'ฏ': 'D', 'โ': 'F', 'ฌ': 'G', '็': 'H', '๋': 'J', 'ษ': 'K', 'ศ': 'L',
-  '(': 'Z', ')': 'X', 'ฉ': 'C', 'ฮ': 'V', 'ฺ': 'B', '์': 'N', '?': 'M',
-};
-const fixLayout = (s) => (/[\u0E00-\u0E7F]/.test(s) ? [...s].map((c) => TH[c] ?? c).join('') : s);
-// "*" is removed (Code 39 barcodes carry * start/stop characters)
-const clean = (v) => fixLayout(String(v ?? '').trim()).replace(/\*/g, '').trim().slice(0, 64);
-// Codabar barcodes start and stop with A, B, C or D. Scanners set to send them give D3867497060D for 3867497060.
-const codabar = (s) => { const m = /^[A-D](\d+)[A-D]$/i.exec(s); return m ? m[1] : null; };
-// what to look up for one scan: the number without the Codabar letters first, then as scanned
-// (so a real code that happens to look like A123B still matches itself)
-const forms = (v) => { const s = clean(v); const c = codabar(s); return c ? [c, s] : [s]; };
+// Scanned numbers are cleaned by barcode.js (Thai keyboard layout, *, ^, Codabar letters, AIM IDs, control characters)
+const { forms, best } = require('./barcode');
 
 function dmy(v) {
   const m = String(v ?? '').match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}:\d{2}))?/);
   return m ? `${m[3]}/${m[2]}/${m[1]}${m[4] ? ' ' + m[4] : ''}` : (v ?? '');
 }
 
-module.exports = registerChecker;
-module.exports.clean = clean;
-module.exports.codabar = codabar;
-function registerChecker(app, { db, auth }) {
+module.exports = function registerChecker(app, { db, auth }) {
   const json = express.json({ limit: '10kb' });
 
   const log = (userId, mode, order, in1, in2, result, detail) =>
@@ -41,7 +20,7 @@ function registerChecker(app, { db, auth }) {
   const dayOf = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) ? String(v) : null);
   const onDay = (day) => (day ? ' AND operation_date=?' : '');
   const args = (v, day) => (day ? [v, day] : [v]);
-  // each lookup takes the forms of one scan (see forms()) and uses the first that exists
+  // each lookup takes the forms of one scan (as scanned, then without Codabar letters) and uses the first that exists
   const byWaybill = async (fs, day) => {
     for (const wb of fs) {
       const [[r]] = await db.query(`SELECT box_no, waybill_no, operation_date FROM packings WHERE waybill_no=?${onDay(day)}`, args(wb, day));
@@ -61,7 +40,7 @@ function registerChecker(app, { db, auth }) {
       const [[{ n }]] = await db.query(`SELECT COUNT(*) n FROM packings WHERE box_no=?${onDay(day)}`, args(box, day));
       if (n) return { n, box };
     }
-    return { n: 0, box: fs[0] };
+    return { n: 0, box: best(fs) };
   };
   // only on "not found" with a date: tell the user if the number exists on another date
   const otherDate = async (wbs, boxes, day) => {
@@ -82,7 +61,7 @@ function registerChecker(app, { db, auth }) {
 
   // Ref Check: type = auto | waybill | box
   app.post('/api/checker/ref', auth, json, async (req, res) => {
-    const qs = forms(req.body.q); const q = qs[0]; const type = req.body.type || 'auto'; const day = dayOf(req.body.date);
+    const qs = forms(req.body.q); const q = best(qs); const type = req.body.type || 'auto'; const day = dayOf(req.body.date);
     if (!q) return res.status(400).json({ error: req.t('กรุณากรอกเลข') });
     let wb = null; let box = [];
     if (type !== 'box') wb = await byWaybill(qs, day);
@@ -113,12 +92,12 @@ function registerChecker(app, { db, auth }) {
     const order = req.body.order === 'bw' ? 'bw' : 'wb';
     const day = dayOf(req.body.date); const on = day ? ` ในวันที่ ${dmy(day)}` : '';
     const f1 = forms(req.body.first); const f2 = forms(req.body.second);
-    if (!f1[0] || !f2[0]) return res.status(400).json({ error: req.t('กรุณากรอกให้ครบทั้ง 2 ช่อง') });
+    if (!best(f1) || !best(f2)) return res.status(400).json({ error: req.t('กรุณากรอกให้ครบทั้ง 2 ช่อง') });
     const wbs = order === 'wb' ? f1 : f2;
     const boxes = order === 'wb' ? f2 : f1;
     const wb = await byWaybill(wbs, day);
-    let waybill = wb ? wb.waybill_no : wbs[0];
-    let boxIn = boxes[0];
+    const waybill = wb ? wb.waybill_no : best(wbs);
+    let boxIn = best(boxes);
     let out;
     if (!wb) {
       const c = await boxCount(boxes, day);

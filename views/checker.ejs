@@ -143,8 +143,13 @@
     var pv = out.querySelector('.rprev');
     if (pt) { if (pv) pv.innerHTML = pt; else out.insertAdjacentHTML('beforeend', '<div class="rprev">' + pt + '</div>'); }
   }
-  // drop Code 39 '*' and Codabar start/stop letters (D3867497060D -> 3867497060), like the server does
-  function strip(v) { var s = String(v || '').replace(/\*/g, '').trim(), m = /^[A-D](\d+)[A-D]$/i.exec(s); return m ? m[1] : s; }
+  // the number to show while checking: same cleaning as the server (src/barcode.js) without the Thai keyboard fix
+  function strip(v) {
+    var s = String(v || '').replace(/[\u0000-\u001F\u007F\u200B-\u200D\u2060\uFEFF]/g, '').trim(), prev;
+    do { prev = s; s = s.replace(/^\][A-Za-z][0-9A-Za-z]/, '').replace(/\*/g, '').replace(/^\^+|\^+$/g, '').trim(); } while (s !== prev);
+    var m = /^[A-DTNE](\d+)[A-DTNE]$/i.exec(s);
+    return m ? m[1] : s;
+  }
   function post(url, body) {
     return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), credentials: 'same-origin' })
       .then(function (r) { return r.json(); });

@@ -1,5 +1,6 @@
 const ExcelJS = require('exceljs');
 const { Readable } = require('stream');
+const barcode = require('./barcode');
 
 const HEADERS = ['Box No.', 'Waybill No.', 'Operation Date'];
 const norm = (s) => String(s ?? '').toLowerCase().replace(/[^a-z]/g, '');
@@ -59,8 +60,9 @@ async function readRows(buffer, filename) {
   const rows = [];
   ws.eachRow((row, idx) => {
     if (idx === 1) return;
-    const box = cellText(row.getCell(colMap.box).value);
-    const waybill = cellText(row.getCell(colMap.waybill).value);
+    // numbers scanned into the sheet can carry *, ^, Codabar letters, control characters... (barcode.js)
+    const box = barcode.strip(cellText(row.getCell(colMap.box).value));
+    const waybill = barcode.waybill(cellText(row.getCell(colMap.waybill).value), { layout: false });
     const rawDate = row.getCell(colMap.date).value;
     if (!box && !waybill && (rawDate == null || rawDate === '')) return;
     const date = toDate(rawDate);
