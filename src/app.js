@@ -47,11 +47,24 @@ passport.use(new GoogleStrategy({
 }, async (_a, _r, profile, done) => {
   try {
     const email = (profile.emails?.[0]?.value || '').toLowerCase();
+    const verified = profile.emails?.[0]?.verified !== false;
     const picture = profile.photos?.[0]?.value || null;
     const [[existing]] = await db.query('SELECT * FROM users WHERE google_id=?', [profile.id]);
     if (existing) {
+      if (existing.deleted_at) {
+        // a deleted user who signs in again asks for access like a new user (same row, so their history stays theirs)
+        const ok = ADMIN_EMAILS.includes(email) || !REQUIRE_APPROVAL;
+        await db.query('UPDATE users SET deleted_at=NULL, role=?, status=? WHERE id=?', [ADMIN_EMAILS.includes(email) ? 'admin' : 'user', ok ? 'active' : 'pending', existing.id]);
+      }
       await db.query('UPDATE users SET email=?, name=?, picture=?, last_login_at=NOW() WHERE id=?', [email, profile.displayName, picture, existing.id]);
       return done(null, existing.id);
+    }
+    // added by an admin with this email: the first Google sign-in with it takes over that row (already approved)
+    const [[added]] = email && verified
+      ? await db.query('SELECT id FROM users WHERE google_id IS NULL AND email=? AND deleted_at IS NULL ORDER BY id LIMIT 1', [email]) : [[null]];
+    if (added) {
+      await db.query('UPDATE users SET google_id=?, name=?, picture=?, last_login_at=NOW() WHERE id=?', [profile.id, profile.displayName, picture, added.id]);
+      return done(null, added.id);
     }
     const [[{ n }]] = await db.query('SELECT COUNT(*) n FROM users');
     const isAdmin = n === 0 || ADMIN_EMAILS.includes(email);
@@ -64,8 +77,8 @@ passport.use(new GoogleStrategy({
 passport.serializeUser((id, done) => done(null, id));
 passport.deserializeUser(async (id, done) => {
   try {
-    const [[u]] = await db.query('SELECT * FROM users WHERE id=?', [id]);
-    done(null, u || false);
+    const [[u]] = await db.query('SELECT * FROM users WHERE id=? AND deleted_at IS NULL', [id]);
+    done(null, u || false); // a deleted user is signed out
   } catch (e) { done(e); }
 });
 
@@ -191,16 +204,43 @@ appAuth.routes(app, { db, auth });
 
 // ---------- users (admin) ----------
 app.get('/users', auth, admin, async (req, res) => {
-  const [users] = await db.query('SELECT * FROM users ORDER BY status=\'pending\' DESC, id');
+  const [users] = await db.query('SELECT * FROM users WHERE deleted_at IS NULL ORDER BY status=\'pending\' DESC, id');
   res.render('users', { users });
 });
-app.post('/users/:id', auth, admin, async (req, res) => {
+// add a user by the email of their Google account: approved now, linked on their first Google sign-in
+const EMAIL = /^[^\s@<>()",;:]+@[^\s@<>()",;:]+\.[^\s@<>()",;:]+$/;
+app.post('/users', auth, admin, async (req, res) => {
+  const email = String(req.body.email || '').trim().toLowerCase();
+  const role = req.body.role === 'admin' ? 'admin' : 'user';
+  if (!EMAIL.test(email) || email.length > 255) { flash(req, 'error', req.t('กรุณากรอก email ให้ถูกต้อง')); return res.redirect('/users'); }
+  const [[dup]] = await db.query('SELECT id FROM users WHERE email=? AND deleted_at IS NULL LIMIT 1', [email]);
+  if (dup) { flash(req, 'error', req.t('มีผู้ใช้ {email} อยู่แล้ว', { email })); return res.redirect('/users'); }
+  // the same person deleted before: bring their old row back so their history stays linked
+  const [[old]] = await db.query('SELECT id FROM users WHERE email=? AND deleted_at IS NOT NULL ORDER BY id DESC LIMIT 1', [email]);
+  if (old) await db.query("UPDATE users SET deleted_at=NULL, status='active', role=? WHERE id=?", [role, old.id]);
+  else await db.query("INSERT INTO users (email, role, status) VALUES (?, ?, 'active')", [email, role]);
+  flash(req, 'ok', req.t('เพิ่ม {email} แล้ว เข้าสู่ระบบด้วย Google ได้ทันที', { email }));
+  res.redirect('/users');
+});
+app.post('/users/:id(\\d+)', auth, admin, async (req, res) => {
   const id = Number(req.params.id);
   if (id === req.user.id) { flash(req, 'error', req.t('แก้ไขสิทธิ์ตัวเองไม่ได้')); return res.redirect('/users'); }
   const { status, role } = req.body;
-  if (['pending', 'active', 'disabled'].includes(status)) await db.query('UPDATE users SET status=? WHERE id=?', [status, id]);
-  if (['admin', 'user'].includes(role)) await db.query('UPDATE users SET role=? WHERE id=?', [role, id]);
+  if (['pending', 'active', 'disabled'].includes(status)) await db.query('UPDATE users SET status=? WHERE id=? AND deleted_at IS NULL', [status, id]);
+  if (['admin', 'user'].includes(role)) await db.query('UPDATE users SET role=? WHERE id=? AND deleted_at IS NULL', [role, id]);
   flash(req, 'ok', req.t('บันทึกแล้ว'));
+  res.redirect('/users');
+});
+// delete: a user who never signed in is removed; anyone else is hidden and blocked (web and Android app),
+// but kept so the upload / check history still shows who did it
+app.post('/users/:id(\\d+)/delete', auth, admin, async (req, res) => {
+  const id = Number(req.params.id);
+  if (id === req.user.id) { flash(req, 'error', req.t('ลบบัญชีตัวเองไม่ได้')); return res.redirect('/users'); }
+  const [[u]] = await db.query('SELECT id, email, google_id FROM users WHERE id=? AND deleted_at IS NULL', [id]);
+  if (!u) { flash(req, 'error', req.t('ไม่พบผู้ใช้นี้')); return res.redirect('/users'); }
+  if (!u.google_id) await db.query('DELETE FROM users WHERE id=?', [id]);
+  else await db.query("UPDATE users SET deleted_at=NOW(), status='disabled' WHERE id=?", [id]);
+  flash(req, 'ok', req.t('ลบ {email} แล้ว', { email: u.email }));
   res.redirect('/users');
 });
 

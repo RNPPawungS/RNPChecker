@@ -76,6 +76,9 @@ nav a.on{background:var(--pri-50);color:var(--pri);font-weight:600}nav a.on svg{
 .btn.ghost:hover{background:#f8fafc;border-color:#d5d9e3;color:var(--ink)}
 .btn.danger{background:#fff;color:var(--err);border-color:#fecaca;box-shadow:none}.btn.danger:hover{background:var(--err-50)}
 .btn.sm{padding:6px 11px;font-size:13px;border-radius:8px}
+.btn.del{color:var(--muted);gap:5px}.btn.del svg{width:15px;height:15px}.btn.del:hover{color:var(--err);border-color:#fecaca;background:var(--err-50)}
+.adduser input[type=email]{flex:1;min-width:240px}
+.row.nowrap{flex-wrap:nowrap;gap:6px}td form{margin:0}.uact{width:100%}.uact > form:last-child{margin-left:auto}
 .btn.google{background:#fff;color:var(--ink);border-color:var(--line);padding:13px 22px;font-size:15px;width:100%;box-shadow:0 1px 2px rgba(15,23,42,.05)}
 .btn.google:hover{background:#f8fafc;border-color:#cbd5e1}
 input,select{font:inherit;font-size:14px;color:var(--ink);padding:9px 12px;border:1px solid var(--line);border-radius:var(--r-sm);background:#fff;transition:border-color .15s,box-shadow .15s;outline:none}

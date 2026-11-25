@@ -37,7 +37,7 @@ function bearer(db) {
     if (!h.startsWith('Bearer ')) return next();
     try {
       const p = verify(h.slice(7), 'a');
-      const [[u]] = p ? await db.query('SELECT * FROM users WHERE id=?', [p.uid]) : [[null]];
+      const [[u]] = p ? await db.query('SELECT * FROM users WHERE id=? AND deleted_at IS NULL', [p.uid]) : [[null]];
       if (!u) return res.status(401).json({ error: 'กรุณาเข้าสู่ระบบใหม่ (สแกน QR จากหน้าเว็บ)', code: 'auth' });
       if (u.status !== 'active') return res.status(403).json({ error: u.status === 'disabled' ? 'บัญชีถูกระงับการใช้งาน' : 'บัญชีกำลังรอผู้ดูแลระบบอนุมัติ', code: 'status' });
       req.user = u;
@@ -75,7 +75,7 @@ function routes(app, { db, auth }) {
   app.post('/api/app/token', json, async (req, res) => {
     const p = verify(req.body.code, 'p');
     if (!p) return res.status(400).json({ error: 'QR หมดอายุหรือไม่ถูกต้อง กรุณาเปิดหน้า "เชื่อมแอป Android" ใหม่', code: 'pair' });
-    const [[u]] = await db.query('SELECT id, email, name, role, status FROM users WHERE id=?', [p.uid]);
+    const [[u]] = await db.query('SELECT id, email, name, role, status FROM users WHERE id=? AND deleted_at IS NULL', [p.uid]);
     if (!u || u.status !== 'active') return res.status(403).json({ error: 'บัญชีนี้ยังใช้งานไม่ได้', code: 'status' });
     res.json({ token: sign('a', u.id, APP_TTL), email: u.email, name: u.name, role: u.role });
   });
