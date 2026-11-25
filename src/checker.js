@@ -29,13 +29,29 @@ module.exports = function registerChecker(app, { db, auth }) {
     db.query('INSERT INTO check_logs (user_id, mode, check_order, input1, input2, result, detail) VALUES (?,?,?,?,?,?,?)',
       [userId, mode, order, in1, in2, result, detail ? String(detail).slice(0, 500) : null]).catch((e) => console.error('check log', e.message));
 
-  const byWaybill = async (wb) => {
-    const [[r]] = await db.query('SELECT box_no, waybill_no, operation_date FROM packings WHERE waybill_no=?', [wb]);
+  // day = 'YYYY-MM-DD' limits every lookup to that operation date (null = all dates)
+  const dayOf = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) ? String(v) : null);
+  const onDay = (day) => (day ? ' AND operation_date=?' : '');
+  const args = (v, day) => (day ? [v, day] : [v]);
+  const byWaybill = async (wb, day) => {
+    const [[r]] = await db.query(`SELECT box_no, waybill_no, operation_date FROM packings WHERE waybill_no=?${onDay(day)}`, args(wb, day));
     return r || null;
   };
-  const byBox = async (box) => {
-    const [rows] = await db.query('SELECT box_no, waybill_no, operation_date FROM packings WHERE box_no=? ORDER BY waybill_no LIMIT 2000', [box]);
+  const byBox = async (box, day) => {
+    const [rows] = await db.query(`SELECT box_no, waybill_no, operation_date FROM packings WHERE box_no=?${onDay(day)} ORDER BY waybill_no LIMIT 2000`, args(box, day));
     return rows;
+  };
+  const boxCount = async (box, day) => {
+    const [[{ n }]] = await db.query(`SELECT COUNT(*) n FROM packings WHERE box_no=?${onDay(day)}`, args(box, day));
+    return n;
+  };
+  // only on "not found" with a date: tell the user if the number exists on another date
+  const otherDate = async (wb, box, day) => {
+    if (!day) return '';
+    const [[w]] = wb ? await db.query('SELECT operation_date FROM packings WHERE waybill_no=?', [wb]) : [[null]];
+    if (w) return ` (Waybill นี้อยู่ในวันที่ ${dmy(w.operation_date)})`;
+    const [[b]] = box ? await db.query('SELECT operation_date FROM packings WHERE box_no=? ORDER BY operation_date DESC LIMIT 1', [box]) : [[null]];
+    return b ? ` (Box นี้อยู่ในวันที่ ${dmy(b.operation_date)})` : '';
   };
 
   // remembers the last tab in a cookie so a refresh / revisit opens the same check type
@@ -48,51 +64,52 @@ module.exports = function registerChecker(app, { db, auth }) {
 
   // Ref Check: type = auto | waybill | box
   app.post('/api/checker/ref', auth, json, async (req, res) => {
-    const q = clean(req.body.q); const type = req.body.type || 'auto';
+    const q = clean(req.body.q); const type = req.body.type || 'auto'; const day = dayOf(req.body.date);
     if (!q) return res.status(400).json({ error: 'กรุณากรอกเลข' });
     let wb = null; let box = [];
-    if (type !== 'box') wb = await byWaybill(q);
-    if (!wb && type !== 'waybill') box = await byBox(q);
+    if (type !== 'box') wb = await byWaybill(q, day);
+    if (!wb && type !== 'waybill') box = await byBox(q, day);
+    const on = day ? ` ในวันที่ ${dmy(day)}` : '';
     let out;
     if (wb) {
       out = { result: 'found', kind: 'waybill', input: q, box_no: wb.box_no, waybill_no: wb.waybill_no, operation_date: dmy(wb.operation_date) };
-      const [[{ n }]] = await db.query('SELECT COUNT(*) n FROM packings WHERE box_no=?', [wb.box_no]);
-      out.box_count = n;
+      out.box_count = await boxCount(wb.box_no, day);
     } else if (box.length) {
       const dates = [...new Set(box.map((r) => dmy(r.operation_date)))];
       out = { result: 'found', kind: 'box', input: q, box_no: box[0].box_no, count: box.length, dates,
         waybills: box.map((r) => ({ waybill_no: r.waybill_no, operation_date: dmy(r.operation_date) })) };
     } else {
       out = { result: 'not_found', input: q,
-        message: type === 'waybill' ? 'ไม่พบ Waybill No. นี้' : type === 'box' ? 'ไม่พบ Box No. นี้' : 'ไม่พบทั้ง Waybill No. และ Box No.' };
+        message: (type === 'waybill' ? 'ไม่พบ Waybill No. นี้' : type === 'box' ? 'ไม่พบ Box No. นี้' : 'ไม่พบทั้ง Waybill No. และ Box No.') + on
+          + await otherDate(type !== 'box' ? q : null, type !== 'waybill' ? q : null, day) };
     }
+    out.date = day ? dmy(day) : null;
     log(req.user.id, 'ref', null, q, null, out.result,
-      out.result === 'not_found' ? out.message : out.kind === 'waybill' ? `Waybill → Box ${out.box_no}` : `Box → ${out.count} Waybill`);
+      (out.result === 'not_found' ? out.message : out.kind === 'waybill' ? `Waybill → Box ${out.box_no}` : `Box → ${out.count} Waybill`) + (day && out.result !== 'not_found' ? ` · ${dmy(day)}` : ''));
     res.json(out);
   });
 
   // Cross Ref Check: order wb = Waybill then Box, bw = Box then Waybill
   app.post('/api/checker/cross', auth, json, async (req, res) => {
     const order = req.body.order === 'bw' ? 'bw' : 'wb';
+    const day = dayOf(req.body.date); const on = day ? ` ในวันที่ ${dmy(day)}` : '';
     const first = clean(req.body.first); const second = clean(req.body.second);
     if (!first || !second) return res.status(400).json({ error: 'กรุณากรอกให้ครบทั้ง 2 ช่อง' });
     const waybill = order === 'wb' ? first : second;
     const boxIn = order === 'wb' ? second : first;
-    const wb = await byWaybill(waybill);
+    const wb = await byWaybill(waybill, day);
     let out;
     if (!wb) {
-      const [[{ n }]] = await db.query('SELECT COUNT(*) n FROM packings WHERE box_no=?', [boxIn]);
-      out = { result: 'not_found', message: `ไม่พบ Waybill No. ${waybill} ในระบบ` + (n ? '' : ` และไม่พบ Box No. ${boxIn}`) };
+      const n = await boxCount(boxIn, day);
+      out = { result: 'not_found', message: `ไม่พบ Waybill No. ${waybill}${on || ' ในระบบ'}` + (n ? '' : ` และไม่พบ Box No. ${boxIn}`) + await otherDate(waybill, null, day) };
     } else if (wb.box_no.toLowerCase() === boxIn.toLowerCase()) {
       out = { result: 'match', message: `Waybill ${wb.waybill_no} อยู่ในกล่อง ${wb.box_no} ถูกต้อง` };
     } else {
       out = { result: 'mismatch', message: `ไม่ตรง: Waybill ${wb.waybill_no} อยู่ในกล่อง ${wb.box_no} ไม่ใช่ ${boxIn}`, expected_box: wb.box_no };
     }
     Object.assign(out, { order, waybill_no: waybill, box_no: boxIn, operation_date: wb ? dmy(wb.operation_date) : null });
-    if (order === 'bw') {
-      const [[{ n }]] = await db.query('SELECT COUNT(*) n FROM packings WHERE box_no=?', [boxIn]);
-      out.box_count = n;
-    }
+    if (order === 'bw') out.box_count = await boxCount(boxIn, day);
+    out.date = day ? dmy(day) : null;
     log(req.user.id, 'cross', order, first, second, out.result, out.message);
     res.json(out);
   });

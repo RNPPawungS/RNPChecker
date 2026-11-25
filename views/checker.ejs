@@ -3,12 +3,13 @@
 <div class="tabs">
   <a href="/checker?tab=ref" class="<%= tab==='ref'?'on':'' %>">1. Ref Check</a>
   <a href="/checker?tab=cross" class="<%= tab==='cross'?'on':'' %>">2. Cross Ref Check</a>
+  <label class="opdate">Operation Date <input id="opDate" class="mono" size="10" autocomplete="off"> <button type="button" class="btn ghost sm" id="opToday">วันนี้</button></label>
   <label class="sound"><input type="checkbox" id="snd" checked> เสียงแจ้งผล</label>
 </div>
 
 <% if (tab==='ref') { %>
 <div class="card">
-  <p class="muted">ยิงหรือพิมพ์เลข แล้วกด Enter · ใส่ Waybill No. จะได้ Box No. · ใส่ Box No. จะได้รายการ Waybill No. ในกล่อง</p>
+  <p class="muted">ค้นหาเฉพาะ Operation Date ที่เลือก · ยิงหรือพิมพ์เลข แล้วกด Enter · ใส่ Waybill No. จะได้ Box No. · ใส่ Box No. จะได้รายการ Waybill No. ในกล่อง</p>
   <form id="refForm" class="row" autocomplete="off">
     <input id="refQ" class="scan" placeholder="Waybill No. หรือ Box No." autofocus>
     <select id="refType"><option value="auto">ตรวจอัตโนมัติ</option><option value="waybill">เป็น Waybill No.</option><option value="box">เป็น Box No.</option></select>
@@ -55,6 +56,15 @@
     get: function (k, d) { try { var v = localStorage.getItem('ck_' + k); return v == null ? d : v; } catch (e) { return d; } },
     set: function (k, v) { try { localStorage.setItem('ck_' + k, v); } catch (e) {} },
   };
+  // Operation Date: every check searches only this date (default today)
+  var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+  var dmyOf = function (d) { return pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear(); };
+  var fp = flatpickr($('opDate'), { dateFormat: 'd/m/Y', allowInput: true, disableMobile: true, defaultDate: new Date(),
+    onChange: function () { markDate(); var f = document.querySelector('input.scan'); if (f) f.focus(); } });
+  function opDate() { var d = fp.selectedDates[0] || new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function markDate() { $('opDate').classList.toggle('notToday', $('opDate').value !== dmyOf(new Date())); }
+  $('opToday').addEventListener('click', function () { fp.setDate(new Date(), true); });
+  markDate();
   $('snd').checked = store.get('sound', '1') === '1';
   $('snd').addEventListener('change', function () { store.set('sound', this.checked ? '1' : '0'); });
   $('allUsers').checked = store.get('all', '0') === '1';
@@ -151,7 +161,7 @@
       $('refQ').value = ''; $('refQ').focus();
       var out = $('refOut'), list = $('refList');
       startWait(out, [['เลขที่ยิง', q, 'hl']]); list.innerHTML = '';
-      post('/api/checker/ref', { q: q, type: $('refType').value }).then(function (d) {
+      post('/api/checker/ref', { q: q, type: $('refType').value, date: opDate() }).then(function (d) {
         if (d.error) { panel(out, { cls: 'bad', title: d.error, summary: q + ' ✖' }); beep(false); return; }
         if (d.result === 'not_found') {
           panel(out, { cls: 'nf', title: 'ไม่พบ', pairs: [['เลขที่ยิง', q, 'hl']], msg: d.message, summary: q + ' → ไม่พบ' }); beep(false);
@@ -205,7 +215,7 @@
       var out = $('crossOut'), wbFirst = order() === 'wb';
       var lbl1 = wbFirst ? 'Waybill No.' : 'Box No.', lbl2 = wbFirst ? 'Box No.' : 'Waybill No.';
       startWait(out, [[lbl1, strip(first), 'hl'], [lbl2, strip(second), 'hl']]);
-      post('/api/checker/cross', { order: order(), first: first, second: second }).then(function (d) {
+      post('/api/checker/cross', { order: order(), first: first, second: second, date: opDate() }).then(function (d) {
         if (my !== seq) return;
         if (d.error) { panel(out, { cls: 'bad', title: d.error }); beep(false); return; }
         var pairs = wbFirst ? [['Waybill No. (ที่ยิง)', d.waybill_no, 'hl big'], ['Box No. (ที่ยิง)', d.box_no, 'hl big']] : [['Box No. (ที่ยิง)', d.box_no, 'hl big'], ['Waybill No. (ที่ยิง)', d.waybill_no, 'hl big']];
