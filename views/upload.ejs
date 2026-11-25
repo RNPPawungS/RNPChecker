@@ -2,12 +2,12 @@
 <h1>อัปโหลดเอกสาร</h1>
 <div class="grid2">
   <div class="card">
-    <h3>1. ดาวน์โหลด template</h3>
+    <h3><span class="step">1</span>ดาวน์โหลด template</h3>
     <p class="muted">ไฟล์ Excel มีคอลัมน์ <b>Box No.</b>, <b>Waybill No.</b>, <b>Operation Date</b> (dd/mm/yyyy)</p>
     <a class="btn" href="/upload/template">⬇️ ดาวน์โหลด template (.xlsx)</a>
   </div>
   <div class="card">
-    <h3>2. อัปโหลดไฟล์</h3>
+    <h3><span class="step">2</span>อัปโหลดไฟล์</h3>
     <form method="post" action="/upload" enctype="multipart/form-data" class="stack" id="upForm">
       <input type="file" name="file" accept=".xlsx,.csv" required>
       <p class="muted sm">รองรับ .xlsx และ .csv · ถ้า Waybill No. มีอยู่แล้ว ระบบจะอัปเดตทับข้อมูลเดิม · หลังอัปโหลดจะแสดงผลรายละเอียดทีละแถว</p>

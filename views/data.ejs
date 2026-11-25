@@ -8,7 +8,7 @@
   <a class="btn ghost" href="/data">ล้าง</a>
   <a class="btn ghost" href="/data/export?<%= new URLSearchParams({q:q.q||'',from:q.from||'',to:q.to||''}) %>">ส่งออก Excel</a>
 </form>
-<details class="card add"><summary>+ เพิ่มรายการ</summary>
+<details class="card add"><summary>เพิ่มรายการ</summary>
   <form method="post" action="/data" class="row">
     <input name="box_no" placeholder="Box No." required>
     <input name="waybill_no" placeholder="Waybill No." required>

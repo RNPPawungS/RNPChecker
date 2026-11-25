@@ -1,15 +1,15 @@
 <%- include('_head') %>
-<h1>📱 เชื่อมแอป Android (Checker)</h1>
+<h1>แอป Android (Checker)</h1>
 <div class="grid2">
   <div class="card center">
-    <h3 style="margin-top:0">1. เข้าสู่ระบบในแอป</h3>
+    <h3><span class="step">1</span>เข้าสู่ระบบในแอป</h3>
     <p>เปิดแอป <b>RNP Checker</b> บนเครื่อง handheld แล้ว<b>ยิงบาร์โค้ด QR นี้</b><br>แอปจะเข้าสู่ระบบเป็น <b><%= user.email %></b></p>
     <div class="qr"><%- qr %></div>
     <p class="muted sm">QR ใช้ได้ <span id="left"><%= ttlMin %>:00</span> นาที · <a href="/app/pair">สร้าง QR ใหม่</a></p>
     <details class="sm"><summary>แสดงรหัส (กรณีพิมพ์เอง)</summary><p class="mono" style="word-break:break-all"><%= code %></p></details>
   </div>
   <div class="card center">
-    <h3 style="margin-top:0">2. ติดตั้งแอป</h3>
+    <h3><span class="step">2</span>ติดตั้งแอป</h3>
     <% if (hasApk) { %>
       <p>สแกน QR นี้ด้วยกล้อง/เบราว์เซอร์ของเครื่อง หรือเปิดลิงก์</p>
       <div class="qr"><%- dlQr %></div>
