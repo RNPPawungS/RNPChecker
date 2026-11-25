@@ -250,6 +250,9 @@ public class MainActivity extends Activity {
             }
         });
         alt.addView(g, new LinearLayout.LayoutParams(-1, dp(52)));
+        TextView gNote = text("ใช้ได้เฉพาะเครื่องที่เข้า packing.rnpexpress.co.th ได้ ถ้าไม่ได้ให้ใช้วิธียิง QR ด้านบน", 12, MUTED, false);
+        gNote.setPadding(0, dp(4), 0, 0);
+        alt.addView(gNote);
         TextView srv = text("เซิร์ฟเวอร์: " + api.server(), 14, MUTED, false);
         srv.setPadding(0, dp(12), 0, 0);
         alt.addView(srv);
