@@ -9,6 +9,7 @@ const multer = require('multer');
 const ExcelJS = require('exceljs');
 const db = require('./db');
 const appAuth = require('./appauth');
+const i18n = require('./i18n');
 const { readRows, buildTemplate, toDate } = require('./parse');
 
 const app = express();
@@ -16,10 +17,13 @@ app.set('trust proxy', 1);
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, '..', 'views'));
 app.locals.icon = require('./icons');
+app.locals.flag = i18n.FLAG;
 app.use('/static', express.static(path.join(__dirname, '..', 'public')));
 app.use('/vendor/font', express.static(path.join(__dirname, '..', 'node_modules', '@fontsource', 'ibm-plex-sans-thai'), { maxAge: '30d' }));
 app.use('/vendor/flatpickr', express.static(path.join(path.dirname(require.resolve('flatpickr')), '..', 'dist')));
 app.use(express.urlencoded({ extended: false }));
+app.use(i18n.middleware); // TH (default) / EN from the "lang" cookie -> req.t, res.locals.t
+i18n.route(app);
 
 const secure = (process.env.BASE_URL || '').startsWith('https');
 app.use(session({
@@ -146,17 +150,17 @@ app.get('/data/export', auth, async (req, res) => {
 
 app.post('/data', auth, async (req, res) => {
   const box = (req.body.box_no || '').trim(); const wb = (req.body.waybill_no || '').trim(); const d = toDate(req.body.operation_date);
-  if (!box || !wb || !d) { flash(req, 'error', 'กรอกข้อมูลให้ครบและถูกต้อง'); return back(req, res); }
+  if (!box || !wb || !d) { flash(req, 'error', req.t('กรอกข้อมูลให้ครบและถูกต้อง')); return back(req, res); }
   try {
     if (req.body.id) {
       await db.query('UPDATE packings SET box_no=?, waybill_no=?, operation_date=?, updated_by=? WHERE id=?', [box, wb, d, req.user.id, req.body.id]);
-      flash(req, 'ok', `แก้ไข ${wb} แล้ว`);
+      flash(req, 'ok', req.t('แก้ไข {wb} แล้ว', { wb }));
     } else {
       await db.query('INSERT INTO packings (box_no,waybill_no,operation_date,created_by) VALUES (?,?,?,?)', [box, wb, d, req.user.id]);
-      flash(req, 'ok', `เพิ่ม ${wb} แล้ว`);
+      flash(req, 'ok', req.t('เพิ่ม {wb} แล้ว', { wb }));
     }
   } catch (e) {
-    flash(req, 'error', e.code === 'ER_DUP_ENTRY' ? `Waybill No. ${wb} มีอยู่แล้ว` : e.message);
+    flash(req, 'error', e.code === 'ER_DUP_ENTRY' ? req.t('Waybill No. {wb} มีอยู่แล้ว', { wb }) : e.message);
   }
   back(req, res);
 });
@@ -165,7 +169,7 @@ app.post('/data/delete', auth, async (req, res) => {
   const ids = [].concat(req.body.id || []).map(Number).filter(Boolean);
   if (ids.length) {
     const [r] = await db.query('DELETE FROM packings WHERE id IN (?)', [ids]);
-    flash(req, 'ok', `ลบ ${r.affectedRows} รายการแล้ว`);
+    flash(req, 'ok', req.t('ลบ {n} รายการแล้ว', { n: r.affectedRows }));
   }
   back(req, res);
 });
@@ -175,7 +179,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 
   fileFilter: (_r, f, cb) => cb(null, /\.(xlsx|csv)$/i.test(f.originalname)) });
 
 app.get('/upload/template', auth, async (req, res) => {
-  const buf = await buildTemplate();
+  const buf = await buildTemplate(req.t);
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', 'attachment; filename="packing-template.xlsx"');
   res.send(Buffer.from(buf));
@@ -192,17 +196,17 @@ app.get('/users', auth, admin, async (req, res) => {
 });
 app.post('/users/:id', auth, admin, async (req, res) => {
   const id = Number(req.params.id);
-  if (id === req.user.id) { flash(req, 'error', 'แก้ไขสิทธิ์ตัวเองไม่ได้'); return res.redirect('/users'); }
+  if (id === req.user.id) { flash(req, 'error', req.t('แก้ไขสิทธิ์ตัวเองไม่ได้')); return res.redirect('/users'); }
   const { status, role } = req.body;
   if (['pending', 'active', 'disabled'].includes(status)) await db.query('UPDATE users SET status=? WHERE id=?', [status, id]);
   if (['admin', 'user'].includes(role)) await db.query('UPDATE users SET role=? WHERE id=?', [role, id]);
-  flash(req, 'ok', 'บันทึกแล้ว');
+  flash(req, 'ok', req.t('บันทึกแล้ว'));
   res.redirect('/users');
 });
 
 app.use((err, req, res, _next) => {
   console.error(err);
-  res.status(500).send('เกิดข้อผิดพลาด: ' + (err.message || err));
+  res.status(500).send((req.t || i18n.T.th)('เกิดข้อผิดพลาด: ') + (err.message || err));
 });
 
 const port = Number(process.env.PORT || 3000);

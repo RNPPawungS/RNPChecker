@@ -1,9 +1,9 @@
 <%- include('_head') %>
 <div class="center card login">
-  <h2>เข้าสู่ระบบสำเร็จ</h2>
+  <h2><%= t('เข้าสู่ระบบสำเร็จ') %></h2>
   <p><b><%= user.email %></b></p>
-  <p><a class="btn" id="open" href="<%= link %>">เปิดแอป RNP Checker</a></p>
-  <p class="muted sm">ถ้าแอปไม่เปิดเอง ให้กดปุ่มด้านบน</p>
+  <p><a class="btn" id="open" href="<%= link %>"><%= t('เปิดแอป RNP Checker') %></a></p>
+  <p class="muted sm"><%= t('ถ้าแอปไม่เปิดเอง ให้กดปุ่มด้านบน') %></p>
 </div>
 <script>setTimeout(function () { location.href = document.getElementById('open').href; }, 300);</script>
 <%- include('_foot') %>

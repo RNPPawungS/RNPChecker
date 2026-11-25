@@ -13,11 +13,12 @@
   - *Cross Ref Check* ตรวจคู่ Waybill/Box เลือกลำดับได้ แสดงผลตรง/ไม่ตรงชัดเจนพร้อมเสียง
   - เลือก Operation Date (ค่าเริ่มต้นวันนี้) แล้วค้นหาเฉพาะวันนั้น ตัด `*` (Code 39) และแปลงตัวอักษรที่พิมพ์ผิดเพราะคีย์บอร์ดเป็นภาษาไทยให้อัตโนมัติ มีบันทึกประวัติการตรวจ
 
+- **2 ภาษา ไทย / English** สลับด้วยปุ่มธงชาติมุมขวาบน (ค่าเริ่มต้นภาษาไทย ระบบจำภาษาที่เลือกไว้ในเบราว์เซอร์ 1 ปี) คำแปลอยู่ใน `src/i18n.js` ข้อความในหน้าเว็บเขียนเป็นภาษาไทยแล้วครอบด้วย `t('...')`
 - **แอป Android (Checker)** สำหรับเครื่อง handheld ดาวน์โหลดและจับคู่เครื่องได้ที่เมนู "แอป Android (Checker)" รายละเอียดใน [android/README.md](android/README.md)
 
 ## โครงสร้าง
 ```
-src/        app.js (routes หลัก), imports.js (อัปโหลด), checker.js, appauth.js (login ของแอป Android), parse.js (อ่าน Excel/CSV), db.js
+src/        app.js (routes หลัก), imports.js (อัปโหลด), checker.js, appauth.js (login ของแอป Android), parse.js (อ่าน Excel/CSV), db.js, i18n.js (คำแปล TH/EN)
 views/      หน้าเว็บ (EJS)
 public/     CSS
 sql/        schema.sql (ติดตั้งใหม่), migrate-*.sql (อัปเกรดฐานข้อมูลเดิม)

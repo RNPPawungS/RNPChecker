@@ -1,7 +1,7 @@
 <%- include('_head') %>
 <div class="center card login">
-  <h2>รอการอนุมัติ</h2>
-  <p>บัญชี <b><%= user.email %></b> <%= user.status==='disabled' ? 'ถูกระงับการใช้งาน' : 'กำลังรอผู้ดูแลระบบอนุมัติ' %></p>
-  <form method="post" action="/logout"><button class="btn ghost">ออกจากระบบ</button></form>
+  <h2><%= t('รอการอนุมัติ') %></h2>
+  <p><%- t.h(user.status==='disabled' ? 'บัญชี <b>{email}</b> ถูกระงับการใช้งาน' : 'บัญชี <b>{email}</b> กำลังรอผู้ดูแลระบบอนุมัติ', { email: user.email }) %></p>
+  <form method="post" action="/logout"><button class="btn ghost"><%= t('ออกจากระบบ') %></button></form>
 </div>
 <%- include('_foot') %>

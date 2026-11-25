@@ -1,33 +1,33 @@
 <%- include('_head') %>
-<h1>อัปโหลดเอกสาร</h1>
+<h1><%= t('อัปโหลดเอกสาร') %></h1>
 <div class="grid2">
   <div class="card">
-    <h3><span class="step">1</span>ดาวน์โหลด template</h3>
-    <p class="muted">ไฟล์ Excel มีคอลัมน์ <b>Box No.</b>, <b>Waybill No.</b>, <b>Operation Date</b> (dd/mm/yyyy)</p>
-    <a class="btn" href="/upload/template">⬇️ ดาวน์โหลด template (.xlsx)</a>
+    <h3><span class="step">1</span><%= t('ดาวน์โหลด template') %></h3>
+    <p class="muted"><%- t.h('ไฟล์ Excel มีคอลัมน์ <b>Box No.</b>, <b>Waybill No.</b>, <b>Operation Date</b> (dd/mm/yyyy)') %></p>
+    <a class="btn" href="/upload/template">⬇️ <%= t('ดาวน์โหลด template (.xlsx)') %></a>
   </div>
   <div class="card">
-    <h3><span class="step">2</span>อัปโหลดไฟล์</h3>
+    <h3><span class="step">2</span><%= t('อัปโหลดไฟล์') %></h3>
     <form method="post" action="/upload" enctype="multipart/form-data" class="stack" id="upForm">
       <input type="file" name="file" accept=".xlsx,.csv" required>
-      <p class="muted sm">รองรับ .xlsx และ .csv · ถ้า Waybill No. มีอยู่แล้ว ระบบจะอัปเดตทับข้อมูลเดิม · หลังอัปโหลดจะแสดงผลรายละเอียดทีละแถว</p>
-      <button class="btn" id="upBtn">⬆️ อัปโหลด</button>
-      <div class="progress" id="upProg" hidden><div class="bar"><span></span></div><span class="sm muted" id="upTxt">กำลังส่งไฟล์...</span></div>
+      <p class="muted sm"><%= t('รองรับ .xlsx และ .csv · ถ้า Waybill No. มีอยู่แล้ว ระบบจะอัปเดตทับข้อมูลเดิม · หลังอัปโหลดจะแสดงผลรายละเอียดทีละแถว') %></p>
+      <button class="btn" id="upBtn">⬆️ <%= t('อัปโหลด') %></button>
+      <div class="progress" id="upProg" hidden><div class="bar"><span></span></div><span class="sm muted" id="upTxt"><%= t('กำลังส่งไฟล์...') %></span></div>
     </form>
   </div>
 </div>
 <div class="card table">
-<h3>ประวัติการอัปโหลด</h3>
+<h3><%= t('ประวัติการอัปโหลด') %></h3>
 <div class="scroll"><table>
-<thead><tr><th>#</th><th>เวลา</th><th>ไฟล์</th><th>ผู้อัปโหลด</th><th>สถานะ</th><th class="num">ทั้งหมด</th><th class="num">เพิ่มใหม่</th><th class="num">อัปเดต</th><th class="num">ไม่เปลี่ยน</th><th class="num">ผิดพลาด</th><th></th></tr></thead><tbody>
+<thead><tr><th>#</th><th><%= t('เวลา') %></th><th><%= t('ไฟล์') %></th><th><%= t('ผู้อัปโหลด') %></th><th><%= t('สถานะ') %></th><th class="num"><%= t('ทั้งหมด') %></th><th class="num"><%= t('เพิ่มใหม่') %></th><th class="num"><%= t('อัปเดต') %></th><th class="num"><%= t('ไม่เปลี่ยน') %></th><th class="num"><%= t('ผิดพลาด') %></th><th></th></tr></thead><tbody>
 <% history.forEach(h => { %><tr>
   <td class="muted"><%= h.id %></td>
   <td class="nowrap"><%= dmy(h.created_at) %></td><td><%= h.filename %></td><td class="sm"><%= h.email %></td>
-  <td><% if (h.status==='failed') { %><span class="tag disabled">ล้มเหลว</span><% } else if (h.status==='processing') { %><span class="tag pending">กำลังประมวลผล</span><% } else if (h.error_rows>0) { %><span class="tag pending">สำเร็จบางส่วน</span><% } else { %><span class="tag active">สำเร็จ</span><% } %></td>
+  <td><% if (h.status==='failed') { %><span class="tag disabled"><%= t('ล้มเหลว') %></span><% } else if (h.status==='processing') { %><span class="tag pending"><%= t('กำลังประมวลผล') %></span><% } else if (h.error_rows>0) { %><span class="tag pending"><%= t('สำเร็จบางส่วน') %></span><% } else { %><span class="tag active"><%= t('สำเร็จ') %></span><% } %></td>
   <td class="num"><%= h.total_rows %></td><td class="num ok"><%= h.inserted_rows %></td><td class="num"><%= h.updated_rows %></td><td class="num muted"><%= h.unchanged_rows ?? 0 %></td><td class="num <%= h.error_rows ? 'err' : '' %>"><%= h.error_rows %></td>
-  <td><a class="btn ghost sm" href="/upload/<%= h.id %>">ดูรายละเอียด</a></td>
+  <td><a class="btn ghost sm" href="/upload/<%= h.id %>"><%= t('ดูรายละเอียด') %></a></td>
 </tr><% }) %>
-<% if (!history.length) { %><tr><td colspan="11" class="muted center">ยังไม่มีการอัปโหลด</td></tr><% } %>
+<% if (!history.length) { %><tr><td colspan="11" class="muted center"><%= t('ยังไม่มีการอัปโหลด') %></td></tr><% } %>
 </tbody></table></div></div>
 <script>
 (function () {
@@ -42,10 +42,10 @@
     x.upload.onprogress = function (ev) {
       if (!ev.lengthComputable) return;
       var p = Math.round(ev.loaded / ev.total * 100); bar.style.width = p + '%';
-      txt.textContent = p < 100 ? 'กำลังส่งไฟล์... ' + p + '%' : 'กำลังตรวจสอบและบันทึกข้อมูล...';
+      txt.textContent = p < 100 ? <%- t.js('กำลังส่งไฟล์...') %> + ' ' + p + '%' : <%- t.js('กำลังตรวจสอบและบันทึกข้อมูล...') %>;
     };
     x.onload = function () { if (x.responseURL && x.responseURL !== location.href) location.href = x.responseURL; else { document.open(); document.write(x.responseText); document.close(); } };
-    x.onerror = function () { txt.textContent = 'ส่งไฟล์ไม่สำเร็จ กรุณาลองใหม่'; document.getElementById('upBtn').disabled = false; };
+    x.onerror = function () { txt.textContent = <%- t.js('ส่งไฟล์ไม่สำเร็จ กรุณาลองใหม่') %>; document.getElementById('upBtn').disabled = false; };
     x.send(new FormData(f));
   });
 })();

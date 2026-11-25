@@ -1,47 +1,47 @@
 <%- include('_head') %>
-<h1>จัดการข้อมูล</h1>
+<h1><%= t('จัดการข้อมูล') %></h1>
 <form class="card filters" method="get">
-  <input name="q" placeholder="ค้นหา Box No. / Waybill No." value="<%= q.q||'' %>">
-  <label>วันที่ <input class="dp" name="from" placeholder="dd/mm/yyyy" value="<%= q.from||'' %>" autocomplete="off"></label>
-  <label>ถึง <input class="dp" name="to" placeholder="dd/mm/yyyy" value="<%= q.to||'' %>" autocomplete="off"></label>
-  <button class="btn">ค้นหา</button>
-  <a class="btn ghost" href="/data">ล้าง</a>
-  <a class="btn ghost" href="/data/export?<%= new URLSearchParams({q:q.q||'',from:q.from||'',to:q.to||''}) %>">ส่งออก Excel</a>
+  <input name="q" placeholder="<%= t('ค้นหา Box No. / Waybill No.') %>" value="<%= q.q||'' %>">
+  <label><%= t('วันที่|from') %> <input class="dp" name="from" placeholder="dd/mm/yyyy" value="<%= q.from||'' %>" autocomplete="off"></label>
+  <label><%= t('ถึง') %> <input class="dp" name="to" placeholder="dd/mm/yyyy" value="<%= q.to||'' %>" autocomplete="off"></label>
+  <button class="btn"><%= t('ค้นหา') %></button>
+  <a class="btn ghost" href="/data"><%= t('ล้าง') %></a>
+  <a class="btn ghost" href="/data/export?<%= new URLSearchParams({q:q.q||'',from:q.from||'',to:q.to||''}) %>"><%= t('ส่งออก Excel') %></a>
 </form>
-<details class="card add"><summary>เพิ่มรายการ</summary>
+<details class="card add"><summary><%= t('เพิ่มรายการ') %></summary>
   <form method="post" action="/data" class="row">
     <input name="box_no" placeholder="Box No." required>
     <input name="waybill_no" placeholder="Waybill No." required>
     <input class="dp" name="operation_date" placeholder="Operation Date (dd/mm/yyyy)" required autocomplete="off">
-    <button class="btn">บันทึก</button>
+    <button class="btn"><%= t('บันทึก') %></button>
   </form>
 </details>
-<form method="post" action="/data/delete" id="del" onsubmit="return confirm('ยืนยันการลบรายการที่เลือก?')"></form>
+<form method="post" action="/data/delete" id="del" onsubmit="return confirm(<%= t.js('ยืนยันการลบรายการที่เลือก?') %>)"></form>
 <div class="card table">
-<div class="tbar"><span>ทั้งหมด <b><%= total.toLocaleString() %></b> รายการ</span><button form="del" class="btn danger sm">ลบที่เลือก</button></div>
+<div class="tbar"><span><%- t.h('ทั้งหมด <b>{n}</b> รายการ', { n: total.toLocaleString() }) %></span><button form="del" class="btn danger sm"><%= t('ลบที่เลือก') %></button></div>
 <div class="scroll"><table>
-<thead><tr><th><input type="checkbox" onclick="document.querySelectorAll('.ck').forEach(c=>c.checked=this.checked)"></th><th>Box No.</th><th>Waybill No.</th><th>Operation Date</th><th>แก้ไขล่าสุด</th><th></th></tr></thead>
+<thead><tr><th><input type="checkbox" onclick="document.querySelectorAll('.ck').forEach(c=>c.checked=this.checked)"></th><th>Box No.</th><th>Waybill No.</th><th>Operation Date</th><th><%= t('แก้ไขล่าสุด') %></th><th></th></tr></thead>
 <tbody>
 <% rows.forEach(r => { %>
 <tr>
   <td><input type="checkbox" class="ck" name="id" value="<%= r.id %>" form="del"></td>
   <td><%= r.box_no %></td><td class="mono"><%= r.waybill_no %></td><td><%= dmy(r.operation_date) %></td>
   <td class="muted sm"><%= r.updated_email||'' %><br><%= dmy(r.updated_at) %></td>
-  <td><button class="btn ghost sm" type="button" onclick="edit(<%= JSON.stringify({id:r.id,b:r.box_no,w:r.waybill_no,d:dmy(r.operation_date)}) %>)">แก้ไข</button></td>
+  <td><button class="btn ghost sm" type="button" onclick="edit(<%= JSON.stringify({id:r.id,b:r.box_no,w:r.waybill_no,d:dmy(r.operation_date)}) %>)"><%= t('แก้ไข') %></button></td>
 </tr>
 <% }) %>
-<% if (!rows.length) { %><tr><td colspan="6" class="muted center">ไม่พบข้อมูล</td></tr><% } %>
+<% if (!rows.length) { %><tr><td colspan="6" class="muted center"><%= t('ไม่พบข้อมูล') %></td></tr><% } %>
 </tbody></table></div>
 <% if (pages>1) { const p = (n)=>'?'+new URLSearchParams({...q,page:n}); %>
-<div class="pager"><% if (page>1) { %><a href="<%= p(page-1) %>">‹ ก่อนหน้า</a><% } %><span>หน้า <%= page %> / <%= pages %></span><% if (page<pages) { %><a href="<%= p(page+1) %>">ถัดไป ›</a><% } %></div>
+<div class="pager"><% if (page>1) { %><a href="<%= p(page-1) %>"><%= t('‹ ก่อนหน้า') %></a><% } %><span><%= t('หน้า {page} / {pages}', { page, pages }) %></span><% if (page<pages) { %><a href="<%= p(page+1) %>"><%= t('ถัดไป ›') %></a><% } %></div>
 <% } %>
 </div>
 <dialog id="dlg"><form method="post" action="/data" class="stack">
-  <h3>แก้ไขรายการ</h3><input type="hidden" name="id">
+  <h3><%= t('แก้ไขรายการ') %></h3><input type="hidden" name="id">
   <label>Box No.<input name="box_no" required></label>
   <label>Waybill No.<input name="waybill_no" required></label>
   <label>Operation Date<input class="dp" name="operation_date" placeholder="dd/mm/yyyy" required autocomplete="off"></label>
-  <div class="row"><button class="btn">บันทึก</button><button type="button" class="btn ghost" onclick="dlg.close()">ยกเลิก</button></div>
+  <div class="row"><button class="btn"><%= t('บันทึก') %></button><button type="button" class="btn ghost" onclick="dlg.close()"><%= t('ยกเลิก') %></button></div>
 </form></dialog>
 <script>
 function edit(r){const f=dlg.querySelector('form');f.id.value=r.id;f.box_no.value=r.b;f.waybill_no.value=r.w;f.operation_date._flatpickr.setDate(r.d, false, 'd/m/Y');dlg.showModal();}

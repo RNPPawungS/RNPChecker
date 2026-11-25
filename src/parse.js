@@ -77,7 +77,7 @@ async function readRows(buffer, filename) {
   return rows;
 }
 
-async function buildTemplate() {
+async function buildTemplate(t = (s) => s.split('|')[0]) {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('Packing');
   ws.columns = [
@@ -89,13 +89,13 @@ async function buildTemplate() {
   ws.getColumn(1).numFmt = '@';
   ws.getColumn(2).numFmt = '@';
   ws.addRow({ box: 'BOX0001', waybill: 'RNP000000001', date: new Date(Date.UTC(2026, 10, 23)) });
-  const info = wb.addWorksheet('คำอธิบาย');
+  const info = wb.addWorksheet(t('คำอธิบาย|sheet'));
   info.addRows([
-    ['คอลัมน์', 'คำอธิบาย'],
-    ['Box No.', 'เลขกล่อง (จำเป็น)'],
-    ['Waybill No.', 'เลขพัสดุ (จำเป็น, ห้ามซ้ำ ถ้าซ้ำกับข้อมูลเดิมจะอัปเดตทับ)'],
-    ['Operation Date', 'วันที่รอบเอกสาร รูปแบบ DD/MM/YYYY (เช่น 23/11/2026) หรือเป็นวันที่ของ Excel'],
-    ['', 'ลบแถวตัวอย่างก่อนอัปโหลด'],
+    [t('คอลัมน์'), t('คำอธิบาย')],
+    ['Box No.', t('เลขกล่อง (จำเป็น)')],
+    ['Waybill No.', t('เลขพัสดุ (จำเป็น, ห้ามซ้ำ ถ้าซ้ำกับข้อมูลเดิมจะอัปเดตทับ)')],
+    ['Operation Date', t('วันที่รอบเอกสาร รูปแบบ DD/MM/YYYY (เช่น 23/11/2026) หรือเป็นวันที่ของ Excel')],
+    ['', t('ลบแถวตัวอย่างก่อนอัปโหลด')],
   ]);
   info.getColumn(1).width = 18; info.getColumn(2).width = 60;
   info.getRow(1).font = { bold: true };

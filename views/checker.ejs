@@ -3,17 +3,17 @@
 <div class="tabs">
   <a href="/checker?tab=ref" class="<%= tab==='ref'?'on':'' %>">1. Ref Check</a>
   <a href="/checker?tab=cross" class="<%= tab==='cross'?'on':'' %>">2. Cross Ref Check</a>
-  <label class="opdate">Operation Date <input id="opDate" class="mono" size="10" autocomplete="off"> <button type="button" class="btn ghost sm" id="opToday">วันนี้</button></label>
-  <label class="sound"><input type="checkbox" id="snd" checked> เสียงแจ้งผล</label>
+  <label class="opdate">Operation Date <input id="opDate" class="mono" size="10" autocomplete="off"> <button type="button" class="btn ghost sm" id="opToday"><%= t('วันนี้') %></button></label>
+  <label class="sound"><input type="checkbox" id="snd" checked> <%= t('เสียงแจ้งผล') %></label>
 </div>
 
 <% if (tab==='ref') { %>
 <div class="card">
-  <p class="muted">ค้นหาเฉพาะ Operation Date ที่เลือก · ยิงหรือพิมพ์เลข แล้วกด Enter · ใส่ Waybill No. จะได้ Box No. · ใส่ Box No. จะได้รายการ Waybill No. ในกล่อง</p>
+  <p class="muted"><%= t('ค้นหาเฉพาะ Operation Date ที่เลือก · ยิงหรือพิมพ์เลข แล้วกด Enter · ใส่ Waybill No. จะได้ Box No. · ใส่ Box No. จะได้รายการ Waybill No. ในกล่อง') %></p>
   <form id="refForm" class="row" autocomplete="off">
-    <input id="refQ" class="scan" placeholder="Waybill No. หรือ Box No." autofocus>
-    <select id="refType"><option value="auto">ตรวจอัตโนมัติ</option><option value="waybill">เป็น Waybill No.</option><option value="box">เป็น Box No.</option></select>
-    <button class="btn">ค้นหา</button>
+    <input id="refQ" class="scan" placeholder="<%= t('Waybill No. หรือ Box No.') %>" autofocus>
+    <select id="refType"><option value="auto"><%= t('ตรวจอัตโนมัติ') %></option><option value="waybill"><%= t('เป็น Waybill No.') %></option><option value="box"><%= t('เป็น Box No.') %></option></select>
+    <button class="btn"><%= t('ค้นหา') %></button>
   </form>
 </div>
 <div id="refOut" class="rout"></div>
@@ -21,7 +21,7 @@
 <% } else { %>
 <div class="card">
   <div class="row">
-    <b>ลำดับการกรอก:</b>
+    <b><%= t('ลำดับการกรอก:') %></b>
     <label class="radio"><input type="radio" name="order" value="wb" checked> Waybill No. → Box No.</label>
     <label class="radio"><input type="radio" name="order" value="bw"> Box No. → Waybill No.</label>
   </div>
@@ -29,27 +29,37 @@
     <label><span id="l1">1. Waybill No.</span><input id="c1" class="scan" autofocus></label>
     <span class="arrow">→</span>
     <label><span id="l2">2. Box No.</span><input id="c2" class="scan"></label>
-    <button class="btn">ตรวจ</button>
-    <button type="button" class="btn ghost" id="cReset">ล้าง</button>
+    <button class="btn"><%= t('ตรวจ') %></button>
+    <button type="button" class="btn ghost" id="cReset"><%= t('ล้าง') %></button>
   </form>
 </div>
 <div id="crossOut" class="rout"></div>
 <div class="stats3">
-  <div class="card stat s-inserted"><span>ตรง (วันนี้)</span><b id="nOk">0</b></div>
-  <div class="card stat s-error"><span>ไม่ตรง</span><b id="nBad">0</b></div>
-  <div class="card stat s-unchanged"><span>ไม่พบในระบบ</span><b id="nNf">0</b></div>
+  <div class="card stat s-inserted"><span><%= t('ตรง (วันนี้)') %></span><b id="nOk">0</b></div>
+  <div class="card stat s-error"><span><%= t('ไม่ตรง') %></span><b id="nBad">0</b></div>
+  <div class="card stat s-unchanged"><span><%= t('ไม่พบในระบบ') %></span><b id="nNf">0</b></div>
 </div>
 <% } %>
 
 <div class="card table">
-  <div class="tbar"><h3 style="margin:0">ประวัติการตรวจวันนี้</h3>
-    <label class="sm"><input type="checkbox" id="allUsers"> แสดงของทุกคน</label></div>
-  <div class="scroll"><table><thead><tr><th>เวลา</th><th>ผู้ตรวจ</th><th>ประเภท</th><th>เลขที่กรอก</th><th>ผล</th><th>รายละเอียด</th></tr></thead><tbody id="logs"></tbody></table></div>
+  <div class="tbar"><h3 style="margin:0"><%= t('ประวัติการตรวจวันนี้') %></h3>
+    <label class="sm"><input type="checkbox" id="allUsers"> <%= t('แสดงของทุกคน') %></label></div>
+  <div class="scroll"><table><thead><tr><th><%= t('เวลา') %></th><th><%= t('ผู้ตรวจ') %></th><th><%= t('ประเภท') %></th><th><%= t('เลขที่กรอก') %></th><th><%= t('ผล') %></th><th><%= t('รายละเอียด') %></th></tr></thead><tbody id="logs"></tbody></table></div>
 </div>
 
 <script>
 (function () {
   var TAB = '<%= tab %>';
+  // texts in the page language
+  var L = {
+    scan: <%- t.js('ครั้งที่ #') %>, now: <%- t.js('เมื่อสักครู่') %>, secAgo: <%- t.js('{n} วินาทีที่แล้ว') %>, minAgo: <%- t.js('{n} นาทีที่แล้ว') %>,
+    latest: <%- t.js('● ผลล่าสุด') %>, stale: <%- t.js('ผลก่อนหน้า · ยิงเลขใหม่เพื่อตรวจ') %>, prev: <%- t.js('ก่อนหน้า:') %>, checking: <%- t.js('กำลังตรวจ...') %>,
+    scanned: <%- t.js('เลขที่ยิง') %>, wbScanned: <%- t.js('Waybill No. (ที่ยิง)') %>, boxScanned: <%- t.js('Box No. (ที่ยิง)') %>,
+    inBox: <%- t.js('ในกล่องนี้') %>, items: <%- t.js('{n} รายการ') %>, item1: <%- t.js('1 รายการ') %>, wbCount: <%- t.js('จำนวน Waybill') %>, wbInBox: <%- t.js('Waybill No. ในกล่อง {box}') %>,
+    rightBox: <%- t.js('กล่องที่ถูกต้อง') %>, ok: <%- t.js('ตรง ถูกต้อง') %>, bad: <%- t.js('ไม่ตรง!') %>, nf: <%- t.js('ไม่พบในระบบ') %>,
+    found: <%- t.js('พบ') %>, match: <%- t.js('ตรง') %>, mismatch: <%- t.js('ไม่ตรง') %>, notFound: <%- t.js('ไม่พบ') %>,
+    offline: <%- t.js('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้') %>, retry: <%- t.js('ลองยิงใหม่อีกครั้ง') %>, noLogs: <%- t.js('ยังไม่มีการตรวจวันนี้') %>, scanWhat: <%- t.js('ยิง {what}') %>,
+  };
   var $ = function (id) { return document.getElementById(id); };
   var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); };
   var store = {
@@ -98,7 +108,7 @@
     var at = new Date();
     var h = '<div class="rpanel ' + o.cls + ' fresh">' +
       '<div class="ricon">' + ICON[o.cls] + '</div><div class="rbody">' +
-      '<div class="rhead"><span class="rnum">ครั้งที่ #' + scanNo + '</span><span class="rtime">' + hhmmss(at) + ' · <span class="ago">เมื่อสักครู่</span></span><span class="rnew">● ผลล่าสุด</span></div>' +
+      '<div class="rhead"><span class="rnum">' + esc(L.scan) + scanNo + '</span><span class="rtime">' + hhmmss(at) + ' · <span class="ago">' + esc(L.now) + '</span></span><span class="rnew">' + esc(L.latest) + '</span></div>' +
       '<div class="rtitle">' + esc(o.title) + '</div>' +
       (o.pairs ? '<div class="rpairs">' + o.pairs.map(function (p) { return '<div class="' + (p[2] || '') + '"><span>' + esc(p[0]) + '</span><b>' + esc(p[1]) + '</b></div>'; }).join('') + '</div>' : '') +
       (o.msg ? '<div class="rmsg">' + esc(o.msg) + '</div>' : '') + '</div></div>';
@@ -110,9 +120,9 @@
     var el = out.querySelector('.rpanel');
     agoTimer = setInterval(function () {
       var sec = Math.round((Date.now() - at) / 1000);
-      el.querySelector('.ago').textContent = sec < 5 ? 'เมื่อสักครู่' : sec < 60 ? sec + ' วินาทีที่แล้ว' : Math.floor(sec / 60) + ' นาทีที่แล้ว';
+      el.querySelector('.ago').textContent = sec < 5 ? L.now : sec < 60 ? L.secAgo.replace('{n}', sec) : L.minAgo.replace('{n}', Math.floor(sec / 60));
     }, 1000);
-    staleTimer = setTimeout(function () { el.classList.remove('fresh'); el.classList.add('stale'); el.querySelector('.rnew').textContent = 'ผลก่อนหน้า · ยิงเลขใหม่เพื่อตรวจ'; }, 10000);
+    staleTimer = setTimeout(function () { el.classList.remove('fresh'); el.classList.add('stale'); el.querySelector('.rnew').textContent = L.stale; }, 10000);
   }
   // coloured frame around the whole screen: flashes on each result, keeps pulsing on mismatch / not found until the next scan
   function alertFrame(cls) {
@@ -125,11 +135,11 @@
   }
   function prevText(out) {
     var last = out.getAttribute('data-last');
-    return last ? '<span class="muted">ก่อนหน้า:</span> ' + esc(last) : '';
+    return last ? '<span class="muted">' + esc(L.prev) + '</span> ' + esc(last) : '';
   }
   function startWait(out, pairs) {
     var pt = prevText(out);
-    panel(out, { cls: 'wait', title: 'กำลังตรวจ...', pairs: pairs });
+    panel(out, { cls: 'wait', title: L.checking, pairs: pairs });
     var pv = out.querySelector('.rprev');
     if (pt) { if (pv) pv.innerHTML = pt; else out.insertAdjacentHTML('beforeend', '<div class="rprev">' + pt + '</div>'); }
   }
@@ -138,15 +148,15 @@
     return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), credentials: 'same-origin' })
       .then(function (r) { return r.json(); });
   }
-  var RES = { found: ['พบ', 't-inserted'], match: ['ตรง', 't-inserted'], mismatch: ['ไม่ตรง', 't-error'], not_found: ['ไม่พบ', 't-unchanged'] };
+  var RES = { found: [L.found, 't-inserted'], match: [L.match, 't-inserted'], mismatch: [L.mismatch, 't-error'], not_found: [L.notFound, 't-unchanged'] };
   function loadLogs() {
     fetch('/api/checker/logs' + ($('allUsers').checked ? '?all=1' : ''), { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (d) {
       $('logs').innerHTML = d.rows.map(function (r) {
         var res = RES[r.result] || [r.result, ''];
         var type = r.mode === 'ref' ? 'Ref Check' : 'Cross (' + (r.check_order === 'bw' ? 'Box→Waybill' : 'Waybill→Box') + ')';
         return '<tr><td class="nowrap">' + esc(r.created_at.split(' ')[1] || r.created_at) + '</td><td class="sm">' + esc(r.email) + '</td><td class="sm">' + type +
-          '</td><td class="mono">' + esc(r.input1) + (r.input2 ? ' → ' + esc(r.input2) : '') + '</td><td><span class="tag ' + res[1] + '">' + res[0] + '</span></td><td class="sm">' + esc(r.detail) + '</td></tr>';
-      }).join('') || '<tr><td colspan="6" class="muted center">ยังไม่มีการตรวจวันนี้</td></tr>';
+          '</td><td class="mono">' + esc(r.input1) + (r.input2 ? ' → ' + esc(r.input2) : '') + '</td><td><span class="tag ' + res[1] + '">' + esc(res[0]) + '</span></td><td class="sm">' + esc(r.detail) + '</td></tr>';
+      }).join('') || '<tr><td colspan="6" class="muted center">' + esc(L.noLogs) + '</td></tr>';
       if ($('nOk')) { $('nOk').textContent = d.summary.match; $('nBad').textContent = d.summary.mismatch; $('nNf').textContent = d.summary.not_found; }
     });
   }
@@ -160,23 +170,23 @@
       var q = strip($('refQ').value); if (!q) { $('refQ').value = ''; return; }
       $('refQ').value = ''; $('refQ').focus();
       var out = $('refOut'), list = $('refList');
-      startWait(out, [['เลขที่ยิง', q, 'hl']]); list.innerHTML = '';
+      startWait(out, [[L.scanned, q, 'hl']]); list.innerHTML = '';
       post('/api/checker/ref', { q: q, type: $('refType').value, date: opDate() }).then(function (d) {
         if (d.error) { panel(out, { cls: 'bad', title: d.error, summary: q + ' ✖' }); beep(false); return; }
         if (d.result === 'not_found') {
-          panel(out, { cls: 'nf', title: 'ไม่พบ', pairs: [['เลขที่ยิง', q, 'hl']], msg: d.message, summary: q + ' → ไม่พบ' }); beep(false);
+          panel(out, { cls: 'nf', title: L.notFound, pairs: [[L.scanned, q, 'hl']], msg: d.message, summary: q + ' → ' + L.notFound }); beep(false);
         } else if (d.kind === 'waybill') {
-          panel(out, { cls: 'ok', title: 'Box No. ' + d.box_no, pairs: [['Waybill No. (ที่ยิง)', d.waybill_no, 'hl'], ['Box No.', d.box_no, 'big'], ['Operation Date', d.operation_date], ['ในกล่องนี้', d.box_count + ' รายการ']],
+          panel(out, { cls: 'ok', title: 'Box No. ' + d.box_no, pairs: [[L.wbScanned, d.waybill_no, 'hl'], ['Box No.', d.box_no, 'big'], ['Operation Date', d.operation_date], [L.inBox, d.box_count == 1 ? L.item1 : L.items.replace('{n}', d.box_count)]],
             summary: d.waybill_no + ' → Box ' + d.box_no }); beep(true);
         } else {
-          panel(out, { cls: 'ok', title: d.count + ' Waybill', pairs: [['Box No. (ที่ยิง)', d.box_no, 'hl'], ['จำนวน Waybill', d.count + ' รายการ', 'big'], ['Operation Date', d.dates.join(', ')]],
+          panel(out, { cls: 'ok', title: d.count + ' Waybill', pairs: [[L.boxScanned, d.box_no, 'hl'], [L.wbCount, d.count == 1 ? L.item1 : L.items.replace('{n}', d.count), 'big'], ['Operation Date', d.dates.join(', ')]],
             summary: 'Box ' + d.box_no + ' → ' + d.count + ' Waybill' });
-          list.innerHTML = '<div class="card table"><div class="scroll"><table><thead><tr><th class="num">#</th><th>Waybill No. ในกล่อง ' + esc(d.box_no) + '</th><th>Operation Date</th></tr></thead><tbody>' +
+          list.innerHTML = '<div class="card table"><div class="scroll"><table><thead><tr><th class="num">#</th><th>' + esc(L.wbInBox.replace('{box}', d.box_no)) + '</th><th>Operation Date</th></tr></thead><tbody>' +
             d.waybills.map(function (w, i) { return '<tr><td class="num muted">' + (i + 1) + '</td><td class="mono">' + esc(w.waybill_no) + '</td><td>' + esc(w.operation_date) + '</td></tr>'; }).join('') +
             '</tbody></table></div></div>'; beep(true);
         }
         loadLogs();
-      }).catch(function () { panel(out, { cls: 'bad', title: 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้', msg: 'ลองยิงใหม่อีกครั้ง' }); beep(false); });
+      }).catch(function () { panel(out, { cls: 'bad', title: L.offline, msg: L.retry }); beep(false); });
     });
   } else {
     var c1 = $('c1'), c2 = $('c2'), seq = 0;
@@ -186,7 +196,7 @@
     function labels() {
       var wb = order() === 'wb';
       $('l1').textContent = '1. ' + (wb ? 'Waybill No.' : 'Box No.'); $('l2').textContent = '2. ' + (wb ? 'Box No.' : 'Waybill No.');
-      c1.placeholder = 'ยิง ' + (wb ? 'Waybill No.' : 'Box No.'); c2.placeholder = 'ยิง ' + (wb ? 'Box No.' : 'Waybill No.');
+      c1.placeholder = L.scanWhat.replace('{what}', wb ? 'Waybill No.' : 'Box No.'); c2.placeholder = L.scanWhat.replace('{what}', wb ? 'Box No.' : 'Waybill No.');
     }
     document.querySelectorAll('input[name=order]').forEach(function (r) {
       r.addEventListener('change', function () { store.set('order', order()); labels(); c1.value = ''; c2.value = ''; c1.focus(); });
@@ -218,14 +228,14 @@
       post('/api/checker/cross', { order: order(), first: first, second: second, date: opDate() }).then(function (d) {
         if (my !== seq) return;
         if (d.error) { panel(out, { cls: 'bad', title: d.error }); beep(false); return; }
-        var pairs = wbFirst ? [['Waybill No. (ที่ยิง)', d.waybill_no, 'hl big'], ['Box No. (ที่ยิง)', d.box_no, 'hl big']] : [['Box No. (ที่ยิง)', d.box_no, 'hl big'], ['Waybill No. (ที่ยิง)', d.waybill_no, 'hl big']];
-        if (d.result === 'mismatch') pairs.push(['กล่องที่ถูกต้อง', d.expected_box, 'big']);
+        var pairs = wbFirst ? [[L.wbScanned, d.waybill_no, 'hl big'], [L.boxScanned, d.box_no, 'hl big']] : [[L.boxScanned, d.box_no, 'hl big'], [L.wbScanned, d.waybill_no, 'hl big']];
+        if (d.result === 'mismatch') pairs.push([L.rightBox, d.expected_box, 'big']);
         if (d.operation_date) pairs.push(['Operation Date', d.operation_date]);
-        var title = d.result === 'match' ? 'ตรง ถูกต้อง' : d.result === 'mismatch' ? 'ไม่ตรง!' : 'ไม่พบในระบบ';
+        var title = d.result === 'match' ? L.ok : d.result === 'mismatch' ? L.bad : L.nf;
         panel(out, { cls: d.result === 'match' ? 'ok' : d.result === 'mismatch' ? 'bad' : 'nf', title: title, pairs: pairs,
           msg: d.message, summary: d.waybill_no + ' / ' + d.box_no + ' → ' + title });
         beep(d.result === 'match'); loadLogs();
-      }).catch(function () { if (my === seq) { panel(out, { cls: 'bad', title: 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้', msg: 'ลองยิงใหม่อีกครั้ง' }); beep(false); } });
+      }).catch(function () { if (my === seq) { panel(out, { cls: 'bad', title: L.offline, msg: L.retry }); beep(false); } });
     }
     // keep the cursor in a scan field if the page is clicked elsewhere
     document.addEventListener('click', function (e) {

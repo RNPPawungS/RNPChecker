@@ -65,7 +65,7 @@ module.exports = function registerChecker(app, { db, auth }) {
   // Ref Check: type = auto | waybill | box
   app.post('/api/checker/ref', auth, json, async (req, res) => {
     const q = clean(req.body.q); const type = req.body.type || 'auto'; const day = dayOf(req.body.date);
-    if (!q) return res.status(400).json({ error: 'กรุณากรอกเลข' });
+    if (!q) return res.status(400).json({ error: req.t('กรุณากรอกเลข') });
     let wb = null; let box = [];
     if (type !== 'box') wb = await byWaybill(q, day);
     if (!wb && type !== 'waybill') box = await byBox(q, day);
@@ -86,6 +86,7 @@ module.exports = function registerChecker(app, { db, auth }) {
     out.date = day ? dmy(day) : null;
     log(req.user.id, 'ref', null, q, null, out.result,
       (out.result === 'not_found' ? out.message : out.kind === 'waybill' ? `Waybill → Box ${out.box_no}` : `Box → ${out.count} Waybill`) + (day && out.result !== 'not_found' ? ` · ${dmy(day)}` : ''));
+    if (out.message) out.message = req.t(out.message); // the log keeps Thai, the page gets its language
     res.json(out);
   });
 
@@ -94,7 +95,7 @@ module.exports = function registerChecker(app, { db, auth }) {
     const order = req.body.order === 'bw' ? 'bw' : 'wb';
     const day = dayOf(req.body.date); const on = day ? ` ในวันที่ ${dmy(day)}` : '';
     const first = clean(req.body.first); const second = clean(req.body.second);
-    if (!first || !second) return res.status(400).json({ error: 'กรุณากรอกให้ครบทั้ง 2 ช่อง' });
+    if (!first || !second) return res.status(400).json({ error: req.t('กรุณากรอกให้ครบทั้ง 2 ช่อง') });
     const waybill = order === 'wb' ? first : second;
     const boxIn = order === 'wb' ? second : first;
     const wb = await byWaybill(waybill, day);
@@ -111,6 +112,7 @@ module.exports = function registerChecker(app, { db, auth }) {
     if (order === 'bw') out.box_count = await boxCount(boxIn, day);
     out.date = day ? dmy(day) : null;
     log(req.user.id, 'cross', order, first, second, out.result, out.message);
+    out.message = req.t(out.message);
     res.json(out);
   });
 
@@ -120,6 +122,6 @@ module.exports = function registerChecker(app, { db, auth }) {
       WHERE l.created_at >= CURDATE() ${mine ? 'AND l.user_id=?' : ''} ORDER BY l.id DESC LIMIT 100`, mine ? [req.user.id] : []);
     const [[s]] = await db.query(`SELECT SUM(result='match') ok, SUM(result='mismatch') bad, SUM(result='not_found') nf
       FROM check_logs WHERE mode='cross' AND created_at >= CURDATE() ${mine ? 'AND user_id=?' : ''}`, mine ? [req.user.id] : []);
-    res.json({ rows: rows.map((r) => ({ ...r, created_at: dmy(r.created_at) })), summary: { match: Number(s.ok || 0), mismatch: Number(s.bad || 0), not_found: Number(s.nf || 0) } });
+    res.json({ rows: rows.map((r) => ({ ...r, created_at: dmy(r.created_at), detail: r.detail && req.t(r.detail) })), summary: { match: Number(s.ok || 0), mismatch: Number(s.bad || 0), not_found: Number(s.nf || 0) } });
   });
 };

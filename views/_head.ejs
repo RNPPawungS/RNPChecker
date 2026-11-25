@@ -1,28 +1,35 @@
 <%
   const active = user && user.status === 'active';
-  const nav = [['/', 'หน้าหลัก', 'home'], ['/data', 'จัดการข้อมูล', 'data'], ['/checker', 'Checker', 'check'], ['/upload', 'อัปโหลด', 'upload']];
-  if (active && user.role === 'admin') nav.push(['/users', 'ผู้ใช้งาน', 'users']);
+  const nav = [['/', t('หน้าหลัก'), 'home'], ['/data', t('จัดการข้อมูล'), 'data'], ['/checker', 'Checker', 'check'], ['/upload', t('อัปโหลด'), 'upload']];
+  if (active && user.role === 'admin') nav.push(['/users', t('ผู้ใช้งาน'), 'users']);
   const on = (h) => (h === '/' ? path === '/' : path.startsWith(h));
+  const langs = [['th', 'ภาษาไทย'], ['en', 'English']];
 %><!doctype html>
-<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="<%= lang %>"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Packing · RNP Express</title>
 <meta name="theme-color" content="#d71920">
 <% ['400','500','600','700'].forEach(function (w) { %><link rel="stylesheet" href="/vendor/font/<%= w %>.css"><% }) %>
 <link rel="stylesheet" href="/vendor/flatpickr/flatpickr.min.css">
 <link rel="stylesheet" href="/static/style.css">
 <script src="/vendor/flatpickr/flatpickr.min.js"></script></head><body class="<%= active ? 'app' : 'auth' %>">
+<% const langSwitch = function () { %><div class="lang" role="group" aria-label="<%= t('ภาษา') %>">
+  <% langs.forEach(function (l) { %><a href="/lang/<%= l[0] %>" class="<%= lang === l[0] ? 'on' : '' %>" title="<%= l[1] %>" aria-label="<%= l[1] %>" lang="<%= l[0] %>"<%- lang === l[0] ? ' aria-current="true"' : '' %>><%- flag[l[0]] %></a><% }) %>
+</div><% } %>
 <% if (active) { %>
 <header class="top"><div class="wrap bar">
   <a class="brand" href="/"><span class="logo"><%- icon('box', 'style="color:#fff"') %></span><span>Packing<small>RNP Express</small></span></a>
   <nav>
     <% nav.forEach(function (n) { %><a href="<%= n[0] %>" class="<%= on(n[0]) ? 'on' : '' %>"><%- icon(n[2]) %><%= n[1] %></a><% }) %>
   </nav>
+  <% langSwitch() %>
   <form method="post" action="/logout" class="me">
     <span class="avatar"><% if (user.picture) { %><img src="<%= user.picture %>" alt="" referrerpolicy="no-referrer"><% } else { %><%= (user.name || user.email || '?').trim().charAt(0) %><% } %></span>
     <span class="who"><b><%= user.name || user.email %></b><span><%= user.email %></span></span>
-    <button class="icon-btn" title="ออกจากระบบ"><%- icon('logout') %></button>
+    <button class="icon-btn" title="<%= t('ออกจากระบบ') %>" aria-label="<%= t('ออกจากระบบ') %>"><%- icon('logout') %></button>
   </form>
 </div></header>
+<% } else { %>
+<div class="lang-float"><% langSwitch() %></div>
 <% } %>
 <main class="wrap">
 <% if (flash) { %><div class="flash <%= flash.type %>"><%= flash.msg %></div><% } %>

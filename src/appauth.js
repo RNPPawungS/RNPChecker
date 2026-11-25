@@ -67,7 +67,7 @@ function routes(app, { db, auth }) {
   });
 
   app.get('/app/download', (req, res) => {
-    if (!fs.existsSync(APK)) return res.status(404).send('ยังไม่มีไฟล์ APK บนเซิร์ฟเวอร์');
+    if (!fs.existsSync(APK)) return res.status(404).send(req.t ? req.t('ยังไม่มีไฟล์ APK บนเซิร์ฟเวอร์') : 'ยังไม่มีไฟล์ APK บนเซิร์ฟเวอร์');
     res.download(APK, 'rnp-checker.apk', { headers: { 'Content-Type': 'application/vnd.android.package-archive' } });
   });
 
