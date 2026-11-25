@@ -15,7 +15,9 @@ const app = express();
 app.set('trust proxy', 1);
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, '..', 'views'));
+app.locals.icon = require('./icons');
 app.use('/static', express.static(path.join(__dirname, '..', 'public')));
+app.use('/vendor/font', express.static(path.join(__dirname, '..', 'node_modules', '@fontsource', 'ibm-plex-sans-thai'), { maxAge: '30d' }));
 app.use('/vendor/flatpickr', express.static(path.join(path.dirname(require.resolve('flatpickr')), '..', 'dist')));
 app.use(express.urlencoded({ extended: false }));
 
