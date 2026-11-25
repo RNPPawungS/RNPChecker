@@ -1,5 +1,11 @@
 <%- include('_head') %>
-<h1><%= t('จัดการข้อมูล') %></h1>
+<div class="phead">
+  <h1><%= t('จัดการข้อมูล') %></h1>
+  <form method="post" action="/upload" enctype="multipart/form-data" id="upForm">
+    <input type="file" name="file" id="upFile" accept=".xlsx,.csv" hidden>
+    <button type="button" class="btn" id="upBtn" title="<%= t('อัปโหลดไฟล์ Excel / CSV') %>"><%- icon('upload') %><span><%= t('อัปโหลดข้อมูล') %></span></button>
+  </form>
+</div>
 <form class="card filters" method="get">
   <input name="q" placeholder="<%= t('ค้นหา Box No. / Waybill No.') %>" value="<%= q.q||'' %>">
   <label><%= t('วันที่|from') %> <input class="dp" name="from" placeholder="dd/mm/yyyy" value="<%= q.from||'' %>" autocomplete="off"></label>
@@ -44,6 +50,15 @@
   <div class="row"><button class="btn"><%= t('บันทึก') %></button><button type="button" class="btn ghost" onclick="dlg.close()"><%= t('ยกเลิก') %></button></div>
 </form></dialog>
 <script>
+(function () {
+  var b = document.getElementById('upBtn'), f = document.getElementById('upFile');
+  b.addEventListener('click', function () { f.click(); });
+  f.addEventListener('change', function () {
+    if (!f.files.length) return;
+    b.disabled = true; b.querySelector('span').textContent = <%- t.js('กำลังส่งไฟล์...') %>;
+    document.getElementById('upForm').submit();
+  });
+})();
 function edit(r){const f=dlg.querySelector('form');f.id.value=r.id;f.box_no.value=r.b;f.waybill_no.value=r.w;f.operation_date._flatpickr.setDate(r.d, false, 'd/m/Y');dlg.showModal();}
 </script>
 <%- include('_foot') %>

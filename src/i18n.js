@@ -44,6 +44,8 @@ const EN = {
   'แอป Android (Checker)': 'Android app (Checker)',
   'ดาวน์โหลดแอปสำหรับเครื่อง handheld และสแกน QR เพื่อเข้าสู่ระบบ': 'Download the handheld app and scan a QR code to sign in',
   'อัปโหลดเอกสาร': 'Upload Data',
+  'อัปโหลดข้อมูล': 'Upload data',
+  'อัปโหลดไฟล์ Excel / CSV': 'Upload an Excel / CSV file',
   'ดาวน์โหลด template และอัปโหลดไฟล์ Excel / CSV': 'Download the template and upload Excel / CSV files',
   'อนุมัติและกำหนดสิทธิ์ผู้ใช้': 'Approve users and set their roles',
 
