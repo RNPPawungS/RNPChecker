@@ -1,13 +1,15 @@
 CREATE TABLE IF NOT EXISTS users (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  google_id VARCHAR(64) NOT NULL UNIQUE,
+  google_id VARCHAR(64) NULL UNIQUE,  -- NULL = added by email, not signed in yet
   email VARCHAR(255) NOT NULL,
   name VARCHAR(255),
   picture TEXT,
   role ENUM('admin','user') NOT NULL DEFAULT 'user',
   status ENUM('pending','active','disabled') NOT NULL DEFAULT 'pending',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  last_login_at TIMESTAMP NULL
+  last_login_at TIMESTAMP NULL,
+  deleted_at TIMESTAMP NULL,          -- deleted users stay so upload / check history keeps their email
+  INDEX idx_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS uploads (

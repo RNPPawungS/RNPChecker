@@ -1,17 +1,32 @@
 <%- include('_head') %>
 <h1><%= t('ผู้ใช้งาน') %></h1>
-<div class="card table"><div class="scroll"><table>
+<div class="card">
+  <h3><%= t('เพิ่มผู้ใช้') %></h3>
+  <form method="post" action="/users" class="row adduser">
+    <input type="email" name="email" placeholder="<%= t('email ของบัญชี Google') %>" required maxlength="255" autocomplete="off">
+    <select name="role"><option value="user"><%= t('ผู้ใช้') %></option><option value="admin"><%= t('ผู้ดูแล') %></option></select>
+    <button class="btn"><%= t('เพิ่มผู้ใช้') %></button>
+  </form>
+  <p class="muted sm" style="margin:10px 0 0"><%= t('ผู้ใช้ที่เพิ่มไว้เข้าสู่ระบบด้วยบัญชี Google ของ email นี้ได้ทันที ไม่ต้องรออนุมัติ') %></p>
+</div>
+<div class="card table">
+<div class="tbar"><span><%- t.h('ทั้งหมด <b>{n}</b> คน', { n: users.length }) %></span></div>
+<div class="scroll"><table>
 <thead><tr><th><%= t('อีเมล') %></th><th><%= t('ชื่อ') %></th><th><%= t('สิทธิ์') %></th><th><%= t('สถานะ') %></th><th><%= t('เข้าใช้ล่าสุด') %></th><th></th></tr></thead><tbody>
 <% users.forEach(u => { %>
-<tr><td><%= u.email %></td><td><%= u.name %></td>
+<tr><td><%= u.email %></td><td><%= u.name || '' %></td>
 <td><%= t(u.role==='admin'?'ผู้ดูแล':'ผู้ใช้') %></td>
 <td><span class="tag <%= u.status %>"><%= t({pending:'รออนุมัติ',active:'ใช้งาน',disabled:'ระงับ|status'}[u.status] || u.status) %></span></td>
-<td class="sm muted"><%= dmy(u.last_login_at) %></td>
-<td class="row"><% if (u.id !== user.id) { %>
-  <form method="post" action="/users/<%= u.id %>">
+<td class="sm muted"><%= u.last_login_at ? dmy(u.last_login_at) : t('ยังไม่เคยเข้าสู่ระบบ') %></td>
+<td><% if (u.id !== user.id) { %><div class="row nowrap uact">
+  <form method="post" action="/users/<%= u.id %>" class="row nowrap">
   <% if (u.status!=='active') { %><button name="status" value="active" class="btn sm"><%= t('อนุมัติ') %></button><% } else { %><button name="status" value="disabled" class="btn danger sm"><%= t('ระงับ') %></button><% } %>
   <button name="role" value="<%= u.role==='admin'?'user':'admin' %>" class="btn ghost sm"><%= t(u.role==='admin'?'ถอดผู้ดูแล':'ตั้งเป็นผู้ดูแล') %></button>
-  </form><% } %></td></tr>
+  </form>
+  <form method="post" action="/users/<%= u.id %>/delete" onsubmit="return confirm(<%= t.js('ลบผู้ใช้ {email} ?\nผู้ใช้นี้จะเข้าสู่ระบบเว็บและแอปไม่ได้อีก ส่วนประวัติการอัปโหลดและการตรวจยังอยู่ครบ', { email: u.email }) %>)">
+    <button class="btn ghost sm del" title="<%= t('ลบผู้ใช้') %>" aria-label="<%= t('ลบผู้ใช้') %> <%= u.email %>"><%- icon('trash') %><%= t('ลบ') %></button>
+  </form>
+</div><% } %></td></tr>
 <% }) %>
 </tbody></table></div></div>
 <%- include('_foot') %>

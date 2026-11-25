@@ -90,6 +90,21 @@ const EN = {
   'ตั้งเป็นผู้ดูแล': 'Make admin',
   'กรอกข้อมูลให้ครบและถูกต้อง': 'Please fill in every field correctly',
   'แก้ไขสิทธิ์ตัวเองไม่ได้': "You can't change your own account",
+  'เพิ่มผู้ใช้': 'Add user',
+  'email ของบัญชี Google': 'Google account email',
+  'ผู้ใช้ที่เพิ่มไว้เข้าสู่ระบบด้วยบัญชี Google ของ email นี้ได้ทันที ไม่ต้องรออนุมัติ': 'The person can sign in right away with the Google account of this email, no approval needed',
+  'ทั้งหมด <b>{n}</b> คน': many('<b>{n}</b> user', '<b>{n}</b> users'),
+  'ยังไม่เคยเข้าสู่ระบบ': 'Not signed in yet',
+  'ลบ': 'Delete',
+  'ลบผู้ใช้': 'Delete user',
+  'ลบผู้ใช้ {email} ?\nผู้ใช้นี้จะเข้าสู่ระบบเว็บและแอปไม่ได้อีก ส่วนประวัติการอัปโหลดและการตรวจยังอยู่ครบ':
+    'Delete user {email}?\nThey will no longer be able to sign in to the website or the app. Their upload and check history is kept.',
+  'กรุณากรอก email ให้ถูกต้อง': 'Please enter a valid email',
+  'มีผู้ใช้ {email} อยู่แล้ว': '{email} is already a user',
+  'เพิ่ม {email} แล้ว เข้าสู่ระบบด้วย Google ได้ทันที': 'Added {email}. They can sign in with Google now',
+  'ลบ {email} แล้ว': 'Deleted {email}',
+  'ลบบัญชีตัวเองไม่ได้': "You can't delete your own account",
+  'ไม่พบผู้ใช้นี้': 'User not found',
   'บันทึกแล้ว': 'Saved',
 
   // data
