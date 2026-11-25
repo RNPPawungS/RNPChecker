@@ -93,6 +93,8 @@ public class MainActivity extends Activity {
     private String lastScan = "";
     private long lastScanAt;
     private String lastSummary = "";
+    // field 1 of Cross Ref shows the clean number; the value sent keeps Codabar letters (the server tries it first)
+    private String c1Sent = "", c1Shown = "";
 
     private final BroadcastReceiver scanReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context c, Intent i) {
@@ -204,7 +206,7 @@ public class MainActivity extends Activity {
             return;
         }
         EditText t = activeField();
-        t.setText(raw);
+        t.setText(raw.replaceAll("[\\r\\n\\t]", "")); // a CR/LF suffix would make the field's text watcher submit a second time
         submit(t);
     }
 
@@ -579,13 +581,15 @@ public class MainActivity extends Activity {
             if (!v.isEmpty()) doRef(v);
         } else if (e == c1) {
             if (v.isEmpty()) { c1.setText(""); return; }
-            c1.setText(v);
+            c1Sent = v; c1Shown = Scan.show(v);
+            c1.setText(c1Shown);
             c2.requestFocus();
             c2.selectAll();
         } else if (e == c2) {
             if (v.isEmpty()) { c2.setText(""); return; }
-            c2.setText(v);
-            String first = Scan.clean(c1.getText().toString());
+            c2.setText(Scan.show(v));
+            String typed = c1.getText().toString();
+            String first = typed.equals(c1Shown) ? c1Sent : Scan.clean(typed);
             if (first.isEmpty()) { c1.setText(""); c1.requestFocus(); return; }
             // clear right away so the next pair can be scanned while this one is checked
             c1.setText(""); c2.setText("");
@@ -599,7 +603,7 @@ public class MainActivity extends Activity {
     private void doRef(final String q) {
         final String type = prefs.getString("refType", "auto");
         final String day = opDate();
-        startWait(pairs("เลขที่ยิง", q, "hl"));
+        startWait(pairs("เลขที่ยิง", Scan.show(q), "hl"));
         if (listIsBox) { listIsBox = false; refreshLogs(0); }
         net.execute(new Runnable() {
             @Override public void run() {
@@ -611,7 +615,7 @@ public class MainActivity extends Activity {
                     final JSONObject d = api.post("/api/checker/ref", body);
                     ui.post(new Runnable() { @Override public void run() { showRef(q, d); } });
                 } catch (final Exception e) {
-                    ui.post(new Runnable() { @Override public void run() { onError(e, null, q); } });
+                    ui.post(new Runnable() { @Override public void run() { onError(e, null, Scan.show(q)); } });
                 }
             }
         });
@@ -620,7 +624,8 @@ public class MainActivity extends Activity {
     private void showRef(String q, JSONObject d) {
         if (!checkerShown) return;
         if ("not_found".equals(d.optString("result"))) {
-            panel(R_NF, "ไม่พบ", pairs("เลขที่ยิง", q, "hl"), d.optString("message"), q + " → ไม่พบ");
+            String shown = d.optString("input", Scan.show(q));
+            panel(R_NF, "ไม่พบ", pairs("เลขที่ยิง", shown, "hl"), d.optString("message"), shown + " → ไม่พบ");
         } else if ("waybill".equals(d.optString("kind"))) {
             List<String[]> p = pairs("Waybill No. (ที่ยิง)", d.optString("waybill_no"), "hl");
             p.add(new String[]{"ในกล่องนี้", d.optInt("box_count") + " รายการ", ""});
@@ -659,8 +664,8 @@ public class MainActivity extends Activity {
     private void doCross(final String first, final String second) {
         final boolean wb = wbFirst();
         final String day = opDate();
-        List<String[]> p = pairs(wb ? "Waybill No." : "Box No.", first, "hl");
-        p.add(new String[]{wb ? "Box No." : "Waybill No.", second, "hl"});
+        List<String[]> p = pairs(wb ? "Waybill No." : "Box No.", Scan.show(first), "hl");
+        p.add(new String[]{wb ? "Box No." : "Waybill No.", Scan.show(second), "hl"});
         startWait(p);
         net.execute(new Runnable() {
             @Override public void run() {
@@ -673,7 +678,7 @@ public class MainActivity extends Activity {
                     final JSONObject d = api.post("/api/checker/cross", body);
                     ui.post(new Runnable() { @Override public void run() { showCross(wb, d); } });
                 } catch (final Exception e) {
-                    ui.post(new Runnable() { @Override public void run() { onError(e, null, first + " / " + second); } });
+                    ui.post(new Runnable() { @Override public void run() { onError(e, null, Scan.show(first) + " / " + Scan.show(second)); } });
                 }
             }
         });
