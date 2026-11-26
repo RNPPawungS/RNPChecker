@@ -9,6 +9,9 @@
   - admin เพิ่มผู้ใช้ล่วงหน้าด้วย email ได้ (เข้าสู่ระบบด้วย Google ของ email นั้นได้ทันทีไม่ต้องรออนุมัติ) และลบผู้ใช้ได้ ผู้ใช้ที่ลบจะเข้าเว็บและแอปไม่ได้ แต่ประวัติการ Import / การตรวจ / การใช้งานยังแสดง email เดิม ถ้ากลับมา login ใหม่ต้องรออนุมัติอีกครั้ง
 - **จัดการข้อมูล** Box No. / Waybill No. / Operation Date ค้นหา กรองช่วงวันที่ (dd/mm/yyyy) เพิ่ม แก้ไข ลบ ส่งออก Excel (ถ้าไม่ได้ค้นหาหรือเลือกช่วงวันที่ จะถามยืนยันก่อน เพราะอาจใช้เวลานาน)
   - ปุ่ม **ดาวน์โหลด Template** (.xlsx) และ **Import ข้อมูล** (.xlsx / .csv) ถ้า Waybill ซ้ำจะอัปเดตทับ มีหน้าผลการ import รายแถว (เพิ่มใหม่ / อัปเดต / ไม่เปลี่ยนแปลง / ผิดพลาด พร้อมค่าก่อน-หลัง) ดาวน์โหลดผลเป็น Excel ได้ และหน้า **ประวัติ Import**
+- **เชื่อม Google Sheet (Connector)** เซิร์ฟเวอร์อ่าน sheet `DATA` ของ Google Sheet ทุก 60 วินาที แถวที่ช่อง `flag_upload` ยังไม่เป็น `true` คือแถวใหม่ จะถูก Import เหมือนอัปโหลดไฟล์ (`DATE` → Operation Date ตัดเวลาออก, `CTN NO.` → Box No., `AWB` → Waybill No. ทำความสะอาดเลขแบบเดียวกับการสแกน) แล้วเขียน `true` ลง `flag_upload` ของแถวที่บันทึกแล้ว ผลอยู่ในหน้า **ประวัติ Import** (ผู้ Import = `google-sheet@connector`) และ **ประวัติการใช้งาน** (การกระทำ "Import ผ่าน Google Sheet (Connector)" พร้อมจำนวน record) admin กด "ตรวจ Sheet ตอนนี้" ในหน้าประวัติ Import ได้
+  - แถวที่ผิด (ไม่มี AWB / วันที่ผิด) แจ้งใน Import ครั้งเดียว ไม่เขียน flag เมื่อแก้ใน sheet แล้วจะถูก Import รอบถัดไป · AWB ซ้ำกันหลายแถว ใช้แถวล่างสุด
+  - Import ทีละรายการเท่านั้น ถ้ามีคนอัปโหลดไฟล์จากหน้าเว็บระหว่างที่ sheet กำลัง Import หน้าเว็บจะขึ้นหน้าจอ "กรุณารอสักครู่" แล้วบันทึกต่อให้เองเมื่อเสร็จ ([src/lock.js](src/lock.js))
 - **ประวัติการใช้งาน** (เฉพาะ admin) ใครทำอะไรเมื่อไร: เข้า/ออกจากระบบ, เข้าสู่ระบบแอป Android, เพิ่ม/แก้ไข/ลบข้อมูล, Import, ส่งออก Excel, ดาวน์โหลด Template, จัดการผู้ใช้ และการตรวจของ Checker ตัวกรองอยู่ที่หัวคอลัมน์แบบ Google Sheets (กดรูปกรวย): เวลา (ช่วงวันที่ / วันนี้ / 7 / 30 วันล่าสุด), ผู้ใช้ และการกระทำ (ติ๊กเลือกได้หลายรายการ), รายละเอียด (ค้นหาข้อความ) ตัวกรองที่ใช้อยู่แสดงเป็นป้ายด้านบน กด × เพื่อเอาออกทีละอัน หรือกด "ล้างตัวกรอง" เพื่อล้างทั้งหมด แสดงหน้าละ 100 รายการ ล่าสุดก่อน เลื่อนหน้าด้วยปุ่ม « ‹ › » หรือพิมพ์เลขหน้าในช่อง "หน้า X จาก Y" (ดึงจากฐานข้อมูลเฉพาะ 100 แถวของหน้านั้น หน้าครึ่งหลังนับจากรายการเก่าสุด จึงเร็วทั้งหน้าแรกและหน้าสุดท้าย)
 - **Checker** (รองรับเครื่องยิงบาร์โค้ด)
   - *Ref Check* ใส่ Waybill No. จะได้ Box No. ใส่ Box No. จะได้รายการ Waybill
@@ -20,7 +23,7 @@
 
 ## โครงสร้าง
 ```
-src/        app.js (routes หลัก), imports.js (Import), activity.js (ประวัติการใช้งาน), checker.js, barcode.js (ทำความสะอาดเลขบาร์โค้ด), appauth.js (login ของแอป Android), parse.js (อ่าน Excel/CSV), db.js, i18n.js / i18n-zh.js (คำแปล EN / 繁體中文)
+src/        app.js (routes หลัก), imports.js (Import), importcore.js (บันทึก Import), sheet.js (Google Sheet connector), lock.js (Import ทีละรายการ), activity.js (ประวัติการใช้งาน), checker.js, barcode.js (ทำความสะอาดเลขบาร์โค้ด), appauth.js (login ของแอป Android), parse.js (อ่าน Excel/CSV), db.js, i18n.js / i18n-zh.js (คำแปล EN / 繁體中文)
 views/      หน้าเว็บ (EJS)
 public/     CSS
 sql/        schema.sql (ติดตั้งใหม่), migrate-*.sql (อัปเกรดฐานข้อมูลเดิม)
@@ -56,6 +59,31 @@ ln -sf /opt/packing-src/deploy/pull-update.sh /usr/local/bin/packing-update
 packing-update
 ```
 ถ้าภายหลังเปลี่ยน repo เป็น private ต้องเพิ่ม deploy key (read-only) ให้เซิร์ฟเวอร์ แล้วเปลี่ยน remote เป็น `git@github.com:RNPPawungS/RNPChecker.git`
+
+## เชื่อม Google Sheet (ตั้งค่าครั้งเดียว)
+ต้องมีหัวคอลัมน์ `DATE`, `CTN NO.`, `AWB`, `flag_upload` ในแถวแรกของ sheet `DATA` (ตำแหน่งคอลัมน์ไม่สำคัญ)
+
+1. **สร้าง service account** ที่ [Google Cloud Console](https://console.cloud.google.com/) (ใช้ project เดียวกับ Google OAuth ของเว็บได้)
+   - APIs & Services → Library → เปิด **Google Sheets API**
+   - IAM & Admin → Service Accounts → Create service account (ตั้งชื่อเช่น `packing-sheet` ไม่ต้องให้ role)
+   - เข้า service account นั้น → Keys → Add key → Create new key → JSON จะได้ไฟล์ .json มา 1 ไฟล์ (เก็บเป็นความลับ)
+2. **แชร์ Google Sheet** ให้ email ของ service account (เช่น `packing-sheet@<project>.iam.gserviceaccount.com`) เป็น **Editor** (ต้องเป็น Editor เพื่อเขียน `flag_upload`; ถ้าองค์กรห้ามแชร์ออกนอกโดเมน ให้ admin ของ Google Workspace อนุญาตก่อน)
+3. **ใส่ไฟล์ key บนเซิร์ฟเวอร์** แล้วตั้งค่า `.env`
+   ```bash
+   # คัดลอกไฟล์ .json ขึ้นเซิร์ฟเวอร์ (เช่น scp) แล้ว
+   mv <ไฟล์>.json /opt/packing/google-service-account.json
+   chown packing:packing /opt/packing/google-service-account.json && chmod 600 /opt/packing/google-service-account.json
+   nano /opt/packing/.env
+   #   GOOGLE_SHEET_ID=13S5QiATVXvOyoVg_5N57oheQjAEuhZU_2DLGeAl1Ay0
+   #   GOOGLE_SHEET_TAB=DATA
+   #   GOOGLE_SERVICE_ACCOUNT_FILE=/opt/packing/google-service-account.json
+   systemctl restart packing
+   journalctl -u packing -n 20 --no-pager   # ต้องเห็น "google sheet connector: tab "DATA", every 60s"
+   ```
+4. เปิดหน้า **ประวัติ Import** ดูการ์ด "Google Sheet Connector" (ตรวจล่าสุด / Import ล่าสุด / ข้อผิดพลาด)
+
+ครั้งแรกจะ Import ทุกแถวที่ยังไม่มี `true` ใน `flag_upload` (Waybill ที่มีอยู่แล้วจะเป็น "ไม่เปลี่ยนแปลง" หรือ "อัปเดต") ถ้าไม่ต้องการข้อมูลเก่า ให้ใส่ `true` ใน `flag_upload` ของแถวเก่าก่อน หรือตั้ง `SHEET_START_ROW` เป็นแถวที่ต้องการเริ่ม
+ไฟล์ key อยู่นอกโฟลเดอร์โค้ด `packing-update` จึงไม่ลบหรือเขียนทับ
 
 ## ตั้งค่า (`.env`)
 ดู `.env.example` ห้าม commit ไฟล์ `.env` จริงขึ้น repo

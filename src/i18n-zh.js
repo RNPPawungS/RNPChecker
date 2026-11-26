@@ -245,6 +245,27 @@ const ZH = {
   'ยิง {what}': '掃描 {what}',
   'กรุณากรอกเลข': '請輸入號碼',
   'กรุณากรอกให้ครบทั้ง 2 ช่อง': '請填寫兩個欄位',
+  // Google Sheet connector (sheet.js) / import waiting screen
+  'Import ผ่าน Google Sheet (Connector)': '經由 Google Sheet 匯入（Connector）',
+  'สั่งโดย {email}': '由 {email} 執行',
+  'เขียน flag_upload {f} แถว': '已寫入 flag_upload {f} 列',
+  'เขียน flag_upload ไม่สำเร็จ: ': '寫入 flag_upload 失敗：',
+  'กำลังตรวจ Google Sheet อยู่แล้ว': '正在檢查 Google Sheet',
+  'ไม่มีแถวใหม่ใน Google Sheet': 'Google Sheet 沒有新的列',
+  'Import จาก Google Sheet แล้ว {n} แถว': '已從 Google Sheet 匯入 {n} 列',
+  'ยังไม่ได้ตั้งค่า Google Sheet connector': '尚未設定 Google Sheet connector',
+  'กรุณารอสักครู่': '請稍候',
+  'ไฟล์ของคุณอยู่ในคิวแล้ว ระบบจะบันทึกต่อให้อัตโนมัติเมื่อรายการก่อนหน้าเสร็จ กรุณาอย่าปิดหน้านี้': '您的檔案已在佇列中，前一個匯入完成後會自動繼續儲存。請勿關閉此頁面。',
+  'กำลัง Import ข้อมูลจาก Google Sheet': '正在從 Google Sheet 匯入資料',
+  'กำลัง Import ไฟล์ของผู้ใช้อื่น': '正在匯入其他使用者的檔案',
+  'ทำงานมาแล้ว {s} วินาที': '已執行 {s} 秒',
+  'ยังไม่ได้ตั้งค่า (ใส่ GOOGLE_SHEET_ID และ GOOGLE_SERVICE_ACCOUNT_FILE ใน .env ดู README)': '尚未設定（請在 .env 設定 GOOGLE_SHEET_ID 和 GOOGLE_SERVICE_ACCOUNT_FILE，見 README）',
+  'Sheet "{tab}" · ตรวจทุก {s} วินาที': '工作表「{tab}」· 每 {s} 秒檢查',
+  'ตรวจล่าสุด': '上次檢查',
+  '{n} แถวใน Sheet': '工作表共 {n} 列',
+  'Import ล่าสุด': '上次匯入',
+  'กำลัง Import': '匯入中',
+  'ตรวจ Sheet ตอนนี้': '立即檢查工作表',
 };
 
 // Stored / composed Thai messages, piece by piece (same order as FRAG in i18n.js)
@@ -269,6 +290,11 @@ const FRAG_ZH = [
   [/^อ่านไฟล์ไม่ได้: /, '無法讀取檔案：'],
   [/ไม่พบ sheet ในไฟล์/g, '檔案中找不到工作表'],
   [/หัวคอลัมน์ไม่ถูกต้อง ต้องมี: /g, '欄位標題不正確，必須包含：'],
+  [/Waybill No\. ซ้ำกับแถวที่ (\d+) ใน Sheet \(ใช้ข้อมูลแถวล่าง\)/g, 'Waybill No. 與工作表第 $1 列重複（使用較下方的列）'],
+  [/^Google login ไม่สำเร็จ: /, 'Google 登入失敗：'],
+  [/^เข้าถึง Google Sheet ไม่ได้ \((\d+)\): (.*) \(แชร์ Sheet ให้ (.+) เป็น Editor หรือยัง\?\)$/, '無法存取 Google Sheet（$1）：$2（是否已將工作表以編輯者權限分享給 $3？）'],
+  [/^Google Sheet ตอบกลับผิดพลาด \((\d+)\): /, 'Google Sheet 錯誤（$1）：'],
+  [/^หัวคอลัมน์ใน sheet "(.*)" ไม่ครบ ต้องมี: /, '工作表「$1」欄位標題不完整，必須包含：'],
   [/^บันทึกไม่สำเร็จ ไม่มีข้อมูลใดถูกบันทึก: /, '儲存失敗，沒有任何資料被儲存：'],
 ];
 

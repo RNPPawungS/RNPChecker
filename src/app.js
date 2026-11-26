@@ -14,6 +14,7 @@ const barcode = require('./barcode');
 const i18n = require('./i18n');
 const activity = require('./activity');
 const { readRows, buildTemplate, toDate } = require('./parse');
+const { CONNECTOR_EMAIL } = require('./sheet');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -69,7 +70,7 @@ passport.use(new GoogleStrategy({
       await db.query('UPDATE users SET google_id=?, name=?, picture=?, last_login_at=NOW() WHERE id=?', [profile.id, profile.displayName, picture, added.id]);
       return done(null, added.id);
     }
-    const [[{ n }]] = await db.query('SELECT COUNT(*) n FROM users');
+    const [[{ n }]] = await db.query('SELECT COUNT(*) n FROM users WHERE email<>?', [CONNECTOR_EMAIL]); // the Google Sheet connector is not a person
     const isAdmin = n === 0 || ADMIN_EMAILS.includes(email);
     const status = isAdmin || !REQUIRE_APPROVAL ? 'active' : 'pending';
     const [r] = await db.query('INSERT INTO users (google_id,email,name,picture,role,status,last_login_at) VALUES (?,?,?,?,?,?,NOW())',
@@ -221,7 +222,10 @@ app.get('/upload/template', auth, async (req, res) => {
   res.send(Buffer.from(buf));
 });
 
-require('./imports')(app, { db, auth, upload, log, flash });
+// Google Sheet connector (sheet.js): imports new rows of the DATA tab every minute, one import at a time with web uploads (lock.js)
+const sheet = require('./sheet')({ db, log });
+sheet.routes(app, { auth, admin, flash });
+require('./imports')(app, { db, auth, upload, log, flash, sheet });
 checker(app, { db, auth });
 appAuth.routes(app, { db, auth, log });
 
@@ -281,4 +285,4 @@ app.use((err, req, res, _next) => {
 });
 
 const port = Number(process.env.PORT || 3000);
-app.listen(port, '127.0.0.1', () => console.log(`packing listening on 127.0.0.1:${port}`));
+app.listen(port, '127.0.0.1', () => { console.log(`packing listening on 127.0.0.1:${port}`); sheet.start(); });

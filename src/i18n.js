@@ -279,6 +279,27 @@ const EN = {
   'ยิง {what}': 'Scan {what}',
   'กรุณากรอกเลข': 'Please enter a number',
   'กรุณากรอกให้ครบทั้ง 2 ช่อง': 'Please fill in both fields',
+  // Google Sheet connector (sheet.js) / import waiting screen
+  'Import ผ่าน Google Sheet (Connector)': 'Import via Google Sheet (Connector)',
+  'สั่งโดย {email}': 'started by {email}',
+  'เขียน flag_upload {f} แถว': many('flag_upload written on {f} row', 'flag_upload written on {f} rows'),
+  'เขียน flag_upload ไม่สำเร็จ: ': 'Writing flag_upload failed: ',
+  'กำลังตรวจ Google Sheet อยู่แล้ว': 'The Google Sheet is being checked already',
+  'ไม่มีแถวใหม่ใน Google Sheet': 'No new rows in the Google Sheet',
+  'Import จาก Google Sheet แล้ว {n} แถว': many('Imported {n} row from the Google Sheet', 'Imported {n} rows from the Google Sheet'),
+  'ยังไม่ได้ตั้งค่า Google Sheet connector': 'The Google Sheet connector is not set up',
+  'กรุณารอสักครู่': 'Please wait',
+  'ไฟล์ของคุณอยู่ในคิวแล้ว ระบบจะบันทึกต่อให้อัตโนมัติเมื่อรายการก่อนหน้าเสร็จ กรุณาอย่าปิดหน้านี้': 'Your file is in the queue. It is saved automatically as soon as the running import finishes. Please keep this page open.',
+  'กำลัง Import ข้อมูลจาก Google Sheet': 'Importing data from the Google Sheet',
+  'กำลัง Import ไฟล์ของผู้ใช้อื่น': 'Importing another user\'s file',
+  'ทำงานมาแล้ว {s} วินาที': 'Running for {s} s',
+  'ยังไม่ได้ตั้งค่า (ใส่ GOOGLE_SHEET_ID และ GOOGLE_SERVICE_ACCOUNT_FILE ใน .env ดู README)': 'Not set up (set GOOGLE_SHEET_ID and GOOGLE_SERVICE_ACCOUNT_FILE in .env, see the README)',
+  'Sheet "{tab}" · ตรวจทุก {s} วินาที': 'Sheet "{tab}" · checked every {s} s',
+  'ตรวจล่าสุด': 'Last check',
+  '{n} แถวใน Sheet': many('{n} row in the sheet', '{n} rows in the sheet'),
+  'Import ล่าสุด': 'Last import',
+  'กำลัง Import': 'Importing',
+  'ตรวจ Sheet ตอนนี้': 'Check the sheet now',
 };
 
 // Messages composed in code or stored in the database: translated piece by piece (applied in order, all matches).
@@ -303,6 +324,11 @@ const FRAG = [
   [/^อ่านไฟล์ไม่ได้: /, 'Cannot read the file: '],
   [/ไม่พบ sheet ในไฟล์/g, 'No worksheet in the file'],
   [/หัวคอลัมน์ไม่ถูกต้อง ต้องมี: /g, 'Wrong column headers, required: '],
+  [/Waybill No\. ซ้ำกับแถวที่ (\d+) ใน Sheet \(ใช้ข้อมูลแถวล่าง\)/g, 'Waybill No. also on row $1 of the sheet (the lower row is used)'],
+  [/^Google login ไม่สำเร็จ: /, 'Google sign-in failed: '],
+  [/^เข้าถึง Google Sheet ไม่ได้ \((\d+)\): (.*) \(แชร์ Sheet ให้ (.+) เป็น Editor หรือยัง\?\)$/, 'Cannot open the Google Sheet ($1): $2 (is it shared with $3 as Editor?)'],
+  [/^Google Sheet ตอบกลับผิดพลาด \((\d+)\): /, 'Google Sheet error ($1): '],
+  [/^หัวคอลัมน์ใน sheet "(.*)" ไม่ครบ ต้องมี: /, 'Missing column headers in sheet "$1", required: '],
   [/^บันทึกไม่สำเร็จ ไม่มีข้อมูลใดถูกบันทึก: /, 'Saving failed, nothing was saved: '],
 ];
 

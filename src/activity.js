@@ -11,6 +11,7 @@ const ACTIONS = {
   data_edit: ['data', 'แก้ไขรายการ'],
   data_delete: ['data', 'ลบรายการ'],
   import: ['file', 'Import ข้อมูล'],
+  import_sheet: ['file', 'Import ผ่าน Google Sheet (Connector)'],
   export: ['file', 'ส่งออก Excel'],
   template: ['file', 'ดาวน์โหลด Template'],
   user_add: ['users', 'เพิ่มผู้ใช้'],
@@ -51,6 +52,13 @@ module.exports = function activity(app, { db, auth, admin, dmy }) {
         if (m.failed) return `${m.file || ''} · ${t('ล้มเหลว')}` + (m.msg ? `: ${t(m.msg)}` : '');
         return `${m.file} · ` + t('ทั้งหมด {n} · เพิ่มใหม่ {a} · อัปเดต {u} · ไม่เปลี่ยน {s} · ผิดพลาด {e}',
           { n: n(m.n), a: n(m.inserted), u: n(m.updated), s: n(m.unchanged), e: n(m.error) });
+      case 'import_sheet': {
+        const src = `Google Sheet "${m.sheet || ''}"` + (m.by ? ` · ${t('สั่งโดย {email}', { email: m.by })}` : '');
+        if (m.failed) return `${src} · ${t('ล้มเหลว')}` + (m.msg ? `: ${t(m.msg)}` : '');
+        return `${src} · ` + t('ทั้งหมด {n} · เพิ่มใหม่ {a} · อัปเดต {u} · ไม่เปลี่ยน {s} · ผิดพลาด {e}',
+          { n: n(m.n), a: n(m.inserted), u: n(m.updated), s: n(m.unchanged), e: n(m.error) })
+          + ' · ' + t('เขียน flag_upload {f} แถว', { f: n(m.flagged) }) + (m.flag_error ? ` (${t('เขียน flag_upload ไม่สำเร็จ: ')}${t(m.flag_error)})` : '');
+      }
       case 'user_add': return `${m.email} (${t(ROLE[m.role] || m.role)})`;
       case 'user_update': return `${m.email}: ` + [m.status && `${t('สถานะ')} → ${t(STATUS[m.status] || m.status)}`,
         m.role && `${t('สิทธิ์')} → ${t(ROLE[m.role] || m.role)}`].filter(Boolean).join(', ');
