@@ -3,14 +3,15 @@
 //   DATE       -> Operation Date   (date / date-time cell, or text dd/mm/yyyy; the time is dropped)
 //   CTN NO.    -> Box No.          (cleaned like a scan: barcode.js)
 //   AWB        -> Waybill No.      (cleaned like a scan: barcode.js)
-//   flag_upload                    the connector writes "true" here once the row is saved, so the sheet shows what is done
+//   flag_upload                    the connector writes the result here: "true" = saved, "false" = could not be imported
 //
-// Every SHEET_POLL_SECONDS (default 60) the server reads the tab. Rows without flag_upload = true are new: when there are any,
-// they are imported as one import (history: "Import ผ่าน Google Sheet", user "Google Sheet Connector"), then "true" is written
-// to flag_upload of the rows that were saved. Rows with an error (no date, bad date...) are reported once and left unflagged;
-// once fixed in the sheet they are imported on the next check. A row with an error must look the same on two checks in a row
-// before it is reported, so a row still being typed is not reported half done.
-// The same Waybill No. on several new rows: the lowest row wins (the rows above it are marked done too).
+// Every SHEET_POLL_SECONDS (default 60) the server reads the tab. Only rows whose flag_upload is empty (neither true nor false)
+// are checked: when there are any, they are imported as one import (history: "Import ผ่าน Google Sheet", user
+// "Google Sheet Connector"), then "true" is written to flag_upload of the rows that were saved and "false" to the rows that
+// could not be imported (no AWB, no date, bad date...). A "false" row is not checked again: fix it in the sheet and clear
+// flag_upload to import it on the next check. A row with an error must look the same on two checks in a row before it gets
+// "false", so a row still being typed is not marked half done.
+// The same Waybill No. on several new rows: the lowest row wins (the rows above it get "true" too).
 // Imports never overlap with uploads from the web page (lock.js).
 //
 // Access: a Google Cloud service account (JSON key file on the server), shared on the sheet as Editor. See README.
@@ -19,7 +20,6 @@ const fs = require('fs');
 const { buildRow } = require('./parse');
 const { saveImport } = require('./importcore');
 const lock = require('./lock');
-const barcode = require('./barcode');
 
 const CONNECTOR_EMAIL = 'google-sheet@connector';
 const CONNECTOR_NAME = 'Google Sheet Connector';
@@ -28,8 +28,9 @@ const HEADERS = 'DATE, CTN NO., AWB, flag_upload';
 const norm = (s) => String(s ?? '').toLowerCase().replace(/[^a-z]/g, '');
 const letter = (i) => { let s = ''; for (i += 1; i > 0; i = Math.floor((i - 1) / 26)) s = String.fromCharCode(65 + ((i - 1) % 26)) + s; return s; };
 const text = (v) => (v == null ? '' : String(v).trim());
-const isTrue = (v) => v === true || text(v).toLowerCase() === 'true';
-/** A built row (parse.js buildRow) by its content, the same as it is kept in upload_rows (to remember reported errors). */
+/** flag_upload already holds a result: true / false (a checkbox or the text) */
+const isDone = (v) => ['true', 'false'].includes(text(v).toLowerCase());
+/** A built row (parse.js buildRow) by its content (to know that a row was not changed between two reads). */
 const keyOf = (r) => crypto.createHash('sha1').update(JSON.stringify([(r.raw || '').slice(0, 64), r.box.slice(0, 64), r.waybill.slice(0, 64)])).digest('base64').slice(0, 16);
 
 function config() {
@@ -100,20 +101,21 @@ async function readSheet(cfg) {
   const rows = [];
   for (let i = cfg.startRow - 1; i < values.length; i++) {
     const v = values[i] || [];
-    const r = { line: i + 1, date: v[col.date], box: text(v[col.box]), waybill: text(v[col.waybill]), flagged: isTrue(v[col.flag]) };
+    const r = { line: i + 1, date: v[col.date], box: text(v[col.box]), waybill: text(v[col.waybill]), flagged: isDone(v[col.flag]) };
     if (text(r.date) || r.box || r.waybill) rows.push(r);
   }
   return { rows, flagCol: letter(col.flag) };
 }
 
-/** Writes "true" to flag_upload of these lines (contiguous lines go in one range). */
-async function writeFlags(cfg, flagCol, lines) {
+/** Writes value ("true" / "false") to flag_upload of these lines (contiguous lines go in one range). */
+async function writeFlags(cfg, flagCol, lines, value = 'true') {
+  if (!lines.length) return 0;
   const sorted = [...new Set(lines)].sort((a, b) => a - b);
   const data = [];
   for (let i = 0; i < sorted.length;) {
     let j = i;
     while (j + 1 < sorted.length && sorted[j + 1] === sorted[j] + 1) j++;
-    data.push({ range: range(cfg, `${flagCol}${sorted[i]}:${flagCol}${sorted[j]}`), values: sorted.slice(i, j + 1).map(() => ['true']) });
+    data.push({ range: range(cfg, `${flagCol}${sorted[i]}:${flagCol}${sorted[j]}`), values: sorted.slice(i, j + 1).map(() => [value]) });
     i = j + 1;
   }
   for (let i = 0; i < data.length; i += 500) {
@@ -130,9 +132,10 @@ module.exports = function sheetConnector({ db, log }) {
     enabled, tab: cfg.tab, every: cfg.every, running: false, lastCheckAt: null, rows: null, pending: 0, lastError: null, lastImport: null,
   };
   let user = null;               // the "Google Sheet Connector" user that imports are saved under
-  const reported = new Set();    // error rows already reported (by content)
   let seenErrors = new Set();    // error rows of the previous check
-  const done = new Map();        // rows saved by this process -> line, so a failed flag write is retried without importing again
+  // rows imported whose flag could not be written yet (e.g. the sheet is shared as Viewer): key -> "true" / "false".
+  // They are not imported again, only the flag is retried.
+  const unflagged = new Map();
   let lastLoggedError = null;
   let timer = null;
 
@@ -146,41 +149,43 @@ module.exports = function sheetConnector({ db, log }) {
     user = { id: r.insertId, email: CONNECTOR_EMAIL };
     return user;
   }
-  // error rows reported by earlier imports (before a restart) are not reported again
-  let seeded = false;
-  async function seedReported() {
-    if (seeded) return;
-    const [rows] = await db.query(`SELECT r.raw_date raw, r.box_no box, r.waybill_no waybill FROM upload_rows r
-      JOIN uploads up ON up.id=r.upload_id WHERE up.user_id=? AND r.status='error' ORDER BY r.id DESC LIMIT 20000`, [(await connectorUser()).id]);
-    rows.forEach((r) => reported.add(keyOf({ raw: r.raw || '', box: r.box || '', waybill: r.waybill || '' })));
-    seeded = true;
-  }
   const logAs = async (meta, ref) => log({ ip: null }, 'import_sheet', meta, ref, await connectorUser());
 
-  /** One check. manual = an admin pressed "ตรวจ Sheet ตอนนี้" (error rows are reported at once). */
+  /** One check. manual = an admin pressed "ตรวจ Sheet ตอนนี้" (error rows get "false" at once). */
   async function check({ manual = false, by = null } = {}) {
     if (!enabled) return { error: 'ยังไม่ได้ตั้งค่า Google Sheet connector' };
     if (st.running) return { busy: true };
     st.running = true;
     try {
-      await seedReported();
       const sheet = await readSheet(cfg);
       st.lastCheckAt = new Date(); st.rows = sheet.rows.length; st.lastError = null; lastLoggedError = null;
 
       const open = sheet.rows.filter((r) => !r.flagged).map((r) => buildRow(r.line, r.box, r.waybill, r.date)).filter(Boolean);
       for (const r of open) r.key = keyOf(r);
-      // saved before but the flag was not written (e.g. the sheet was shared as Viewer): only write the flag
-      const reflag = open.filter((r) => done.has(r.key));
-      const fresh = open.filter((r) => !done.has(r.key));
+      const reflag = open.filter((r) => unflagged.has(r.key));
+      const fresh = open.filter((r) => !unflagged.has(r.key));
       const errs = new Set(fresh.filter((r) => r.errors.length).map((r) => r.key));
-      const take = fresh.filter((r) => !r.errors.length || (!reported.has(r.key) && (manual || seenErrors.has(r.key))));
+      const take = fresh.filter((r) => !r.errors.length || manual || seenErrors.has(r.key));
       seenErrors = errs;
       st.pending = fresh.filter((r) => !r.errors.length).length;
 
+      // write the flags; a row's flag is written only while that line still holds the same data
+      // (someone may have inserted / deleted rows meanwhile). Returns { true: n, false: n }.
       let flagError = null;
-      if (reflag.length) {
-        try { await writeFlags(cfg, sheet.flagCol, reflag.map((r) => r.line)); } catch (e) { flagError = e.message; }
-      }
+      const flag = async (rows, current) => {
+        const at = new Map(current.rows.map((r) => [r.line, r]));
+        const same = (r) => { const x = at.get(r.line); const b = x && buildRow(x.line, x.box, x.waybill, x.date); return b && keyOf(b) === r.key; };
+        const n = { true: 0, false: 0 };
+        for (const v of ['true', 'false']) {
+          const list = rows.filter((r) => unflagged.get(r.key) === v);
+          try {
+            n[v] = await writeFlags(cfg, current.flagCol, list.filter(same).map((r) => r.line), v);
+            list.forEach((r) => unflagged.delete(r.key));
+          } catch (e) { flagError = e.message; }
+        }
+        return n;
+      };
+      if (reflag.length) await flag(reflag, sheet);
       if (!take.length) { if (flagError) st.lastError = flagError; return { nothing: true }; }
 
       const res = await lock.withLock('sheet', CONNECTOR_EMAIL, async () => saveImport(db, {
@@ -191,26 +196,19 @@ module.exports = function sheetConnector({ db, log }) {
         await logAs({ sheet: cfg.tab, failed: 1, msg: res.failed.slice(0, 200), by }, `/upload/${res.uploadId}`);
         return res;
       }
-      for (const r of take) if (r.errors.length) reported.add(r.key);
-      const saved = take.filter((r) => r.status !== 'error');
-      for (const r of saved) done.set(r.key, r.line);
-      if (done.size > 50000) [...done.keys()].slice(0, done.size - 50000).forEach((k) => done.delete(k));
+      for (const r of take) unflagged.set(r.key, r.status === 'error' ? 'false' : 'true');
+      if (unflagged.size > 50000) [...unflagged.keys()].slice(0, unflagged.size - 50000).forEach((k) => unflagged.delete(k));
 
-      // flag only rows that still hold the same data (someone may have inserted / deleted rows meanwhile)
-      let flagged = 0;
-      if (saved.length) {
-        try {
-          const now = await readSheet(cfg);
-          const at = new Map(now.rows.map((r) => [r.line, r]));
-          const ok = saved.filter((r) => { const x = at.get(r.line); return x && barcode.waybill(x.waybill, { layout: false }) === r.waybill; });
-          flagged = await writeFlags(cfg, now.flagCol, ok.map((r) => r.line));
-        } catch (e) { flagError = e.message; }
-      }
+      let n = { true: 0, false: 0 };
+      try { n = await flag(take, await readSheet(cfg)); } catch (e) { flagError = e.message; }
       if (flagError) st.lastError = flagError;
-      st.pending = Math.max(0, st.pending - saved.length);
-      st.lastImport = { at: new Date(), uploadId: res.uploadId, ...res.counts, flagged };
-      await logAs({ sheet: cfg.tab, ...res.counts, flagged, flag_error: flagError ? flagError.slice(0, 200) : undefined, by }, `/upload/${res.uploadId}`);
-      return { ...res, flagged, flagError };
+      const saved = take.filter((r) => r.status !== 'error').length;
+      st.pending = Math.max(0, st.pending - saved);
+      st.lastImport = { at: new Date(), uploadId: res.uploadId, ...res.counts, flagged: n.true, flaggedFalse: n.false };
+      await logAs({
+        sheet: cfg.tab, ...res.counts, flagged: n.true, flagged_false: n.false, flag_error: flagError ? flagError.slice(0, 200) : undefined, by,
+      }, `/upload/${res.uploadId}`);
+      return { ...res, flagged: n.true, flagError };
     } catch (e) {
       st.lastError = e.message;
       console.error('google sheet', e.message);

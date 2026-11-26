@@ -283,6 +283,7 @@ const EN = {
   'Import ผ่าน Google Sheet (Connector)': 'Import via Google Sheet (Connector)',
   'สั่งโดย {email}': 'started by {email}',
   'เขียน flag_upload {f} แถว': many('flag_upload written on {f} row', 'flag_upload written on {f} rows'),
+  'flag_upload: true {f} · false {x} แถว': 'flag_upload: true {f} · false {x} rows',
   'เขียน flag_upload ไม่สำเร็จ: ': 'Writing flag_upload failed: ',
   'กำลังตรวจ Google Sheet อยู่แล้ว': 'The Google Sheet is being checked already',
   'ไม่มีแถวใหม่ใน Google Sheet': 'No new rows in the Google Sheet',

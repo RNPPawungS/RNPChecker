@@ -249,6 +249,7 @@ const ZH = {
   'Import ผ่าน Google Sheet (Connector)': '經由 Google Sheet 匯入（Connector）',
   'สั่งโดย {email}': '由 {email} 執行',
   'เขียน flag_upload {f} แถว': '已寫入 flag_upload {f} 列',
+  'flag_upload: true {f} · false {x} แถว': 'flag_upload：true {f} · false {x} 列',
   'เขียน flag_upload ไม่สำเร็จ: ': '寫入 flag_upload 失敗：',
   'กำลังตรวจ Google Sheet อยู่แล้ว': '正在檢查 Google Sheet',
   'ไม่มีแถวใหม่ใน Google Sheet': 'Google Sheet 沒有新的列',
