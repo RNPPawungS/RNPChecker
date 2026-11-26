@@ -23,7 +23,7 @@ const GROUPS = { auth: 'เข้าสู่ระบบ / ออกจาก�
 const ROLE = { admin: 'ผู้ดูแล', user: 'ผู้ใช้' };
 const STATUS = { pending: 'รออนุมัติ', active: 'ใช้งาน', disabled: 'ระงับ|status' };
 const RESULT = { found: 'พบ', match: 'ตรง', mismatch: 'ไม่ตรง', not_found: 'ไม่พบ' };
-const PER_PAGE = 50;
+const PER_PAGE = 100; // newest first, 100 rows a page
 
 module.exports = function activity(app, { db, auth, admin, dmy }) {
   /** Records an action. user defaults to req.user (pass it when there is no session yet, e.g. the app token). Never throws. */
@@ -65,7 +65,7 @@ module.exports = function activity(app, { db, auth, admin, dmy }) {
   // details = text. Several values of user / action may be chosen; none means no filter.
   app.get('/activity', auth, admin, async (req, res) => {
     const q = req.query;
-    const page = Math.max(1, parseInt(q.page, 10) || 1);
+    let page = Math.max(1, parseInt(q.page, 10) || 1);
     const many = (v) => [...new Set([].concat(v ?? []).map(String))];
     const userIds = many(q.user).map(Number).filter((n) => Number.isInteger(n) && n > 0);
     const acts = many(q.action).filter((a) => ACTIONS[a]);
@@ -91,28 +91,42 @@ module.exports = function activity(app, { db, auth, admin, dmy }) {
     };
     const useA = !acts.length || webActs.length > 0; const useC = !acts.length || modes.length > 0;
     const pa = part('a', false); const pc = part('c', true);
-    const fromA = 'FROM activity_logs a LEFT JOIN users u ON u.id=a.user_id';
-    const fromC = 'FROM check_logs c LEFT JOIN users u ON u.id=c.user_id';
+    // users is joined only when the text filter needs its email / name
+    const fromA = 'FROM activity_logs a' + (text ? ' LEFT JOIN users u ON u.id=a.user_id' : '');
+    const fromC = 'FROM check_logs c' + (text ? ' LEFT JOIN users u ON u.id=c.user_id' : '');
 
     let total = 0;
     if (useA) { const [[{ n }]] = await db.query(`SELECT COUNT(*) n ${fromA} ${pa.sql}`, pa.args); total += n; }
     if (useC) { const [[{ n }]] = await db.query(`SELECT COUNT(*) n ${fromC} ${pc.sql}`, pc.args); total += n; }
+    const pages = Math.max(1, Math.ceil(total / PER_PAGE));
+    page = Math.min(page, pages);
 
-    // newest first across both tables: each side returns at most the rows up to this page, then they are merged
-    const upto = page * PER_PAGE;
+    // Newest first across both tables, in 2 light steps:
+    // 1. only (table, id, time) of the rows up to this page from each table (read from the created_at indexes), merged, cut to this page
+    //    (pages in the older half are counted from the oldest end, so the last pages are as quick as the first)
+    // 2. the full rows for just those ids (at most 100)
+    const skip = (page - 1) * PER_PAGE; const take = Math.min(PER_PAGE, total - skip);
+    const back = skip > total / 2; const dir = back ? 'ASC' : 'DESC';
+    const off = back ? total - skip - take : skip; const upto = off + take;
     const parts = []; const args = [];
-    if (useA) {
-      parts.push(`(SELECT 'a' src, a.id, a.user_id, COALESCE(u.email, a.email) email, u.name, a.action, a.meta, a.ref, a.ip, a.created_at,
-        NULL in1, NULL in2, NULL result, NULL detail, NULL corder ${fromA} ${pa.sql} ORDER BY a.created_at DESC, a.id DESC LIMIT ?)`);
-      args.push(...pa.args, upto);
+    if (useA) { parts.push(`(SELECT 'a' src, a.id, a.created_at ${fromA} ${pa.sql} ORDER BY a.created_at ${dir}, a.id ${dir} LIMIT ?)`); args.push(...pa.args, upto); }
+    if (useC) { parts.push(`(SELECT 'c' src, c.id, c.created_at ${fromC} ${pc.sql} ORDER BY c.created_at ${dir}, c.id ${dir} LIMIT ?)`); args.push(...pc.args, upto); }
+    let [ids] = take > 0 ? await db.query(`SELECT src, id FROM (${parts.join(' UNION ALL ')}) x
+      ORDER BY created_at ${dir}, src ${back ? 'DESC' : 'ASC'}, id ${dir} LIMIT ? OFFSET ?`, [...args, take, off]) : [[]];
+    if (back) ids = ids.reverse();
+    const idsOf = (src) => ids.filter((r) => r.src === src).map((r) => r.id);
+    const full = new Map();
+    if (idsOf('a').length) {
+      const [r] = await db.query(`SELECT 'a' src, a.id, a.user_id, COALESCE(u.email, a.email) email, u.name, a.action, a.meta, a.ref, a.ip, a.created_at
+        FROM activity_logs a LEFT JOIN users u ON u.id=a.user_id WHERE a.id IN (?)`, [idsOf('a')]);
+      r.forEach((x) => full.set('a' + x.id, x));
     }
-    if (useC) {
-      parts.push(`(SELECT 'c' src, c.id, c.user_id, u.email, u.name, CONCAT('check_', c.mode) action, NULL meta, NULL ref, NULL ip, c.created_at,
-        c.input1 in1, c.input2 in2, c.result, c.detail, c.check_order corder ${fromC} ${pc.sql} ORDER BY c.created_at DESC, c.id DESC LIMIT ?)`);
-      args.push(...pc.args, upto);
+    if (idsOf('c').length) {
+      const [r] = await db.query(`SELECT 'c' src, c.id, c.user_id, u.email, u.name, CONCAT('check_', c.mode) action, c.created_at,
+        c.input1 in1, c.input2 in2, c.result, c.detail, c.check_order corder FROM check_logs c LEFT JOIN users u ON u.id=c.user_id WHERE c.id IN (?)`, [idsOf('c')]);
+      r.forEach((x) => full.set('c' + x.id, x));
     }
-    const [rows] = await db.query(`SELECT * FROM (${parts.join(' UNION ALL ')}) x ORDER BY created_at DESC, src, id DESC LIMIT ? OFFSET ?`,
-      [...args, PER_PAGE, (page - 1) * PER_PAGE]);
+    const rows = ids.map((x) => full.get(x.src + x.id)).filter(Boolean);
     const [users] = await db.query('SELECT id, email, name, deleted_at FROM users ORDER BY deleted_at IS NOT NULL, email');
 
     // what the header filters show, and a chip for each active filter (its x link drops just that filter)
@@ -137,8 +151,8 @@ module.exports = function activity(app, { db, auth, admin, dmy }) {
     const groups = Object.entries(GROUPS).map(([g, label]) => ({ label, actions: Object.keys(ACTIONS).filter((k) => ACTIONS[k][0] === g).map((k) => ({ key: k, label: ACTIONS[k][1] })) }));
 
     res.render('activity', {
-      sel, chips, groups, total, page, pages: Math.max(1, Math.ceil(total / PER_PAGE)), users,
-      pageUrl: (n) => { const base = url(null); return base + (base.includes('?') ? '&' : '?') + 'page=' + n; },
+      sel, chips, groups, total, page, pages, perPage: PER_PAGE, users,
+      pageUrl: (n) => { const base = url(null); return n === 1 ? base : base + (base.includes('?') ? '&' : '?') + 'page=' + n; },
       rows: rows.map((r) => ({ ...r, when: dmy(r.created_at), group: (ACTIONS[r.action] || ['other'])[0], label: (ACTIONS[r.action] || [, r.action])[1], text: describe(r, req.t) })),
     });
   });
