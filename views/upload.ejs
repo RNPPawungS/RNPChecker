@@ -1,6 +1,27 @@
 <%- include('_head') %>
 <p><a href="/data"><%= t('‹ กลับไปหน้าจัดการข้อมูล') %></a></p>
 <div class="phead"><div><h1><%= t('ประวัติ Import') %></h1><p><%= t('Import ไฟล์ใหม่ได้ที่ปุ่ม "Import ข้อมูล" ในหน้าจัดการข้อมูล') %></p></div></div>
+<% if (sheet && (sheet.enabled || user.role === 'admin')) { %>
+<div class="card sheetc">
+  <div>
+    <h3><%- icon('sheet') %>Google Sheet Connector</h3>
+    <% if (!sheet.enabled) { %>
+      <p class="muted sm"><%= t('ยังไม่ได้ตั้งค่า (ใส่ GOOGLE_SHEET_ID และ GOOGLE_SERVICE_ACCOUNT_FILE ใน .env ดู README)') %></p>
+    <% } else { %>
+      <div class="meta">
+        <span><%= t('Sheet "{tab}" · ตรวจทุก {s} วินาที', { tab: sheet.tab, s: sheet.every }) %></span>
+        <span><%= t('ตรวจล่าสุด') %>: <%= sheet.lastCheckAt ? dmy(sheet.lastCheckAt) : '–' %><% if (sheet.rows != null) { %> · <%= t('{n} แถวใน Sheet', { n: sheet.rows.toLocaleString() }) %><% } %></span>
+        <% if (sheet.lastImport) { %><span><%= t('Import ล่าสุด') %>: <a href="/upload/<%= sheet.lastImport.uploadId %>">#<%= sheet.lastImport.uploadId %></a> <%= dmy(sheet.lastImport.at) %> · <%= t('{n} แถว', { n: sheet.lastImport.n.toLocaleString() }) %></span><% } %>
+        <% if (sheet.running || sheet.lock === 'sheet') { %><span class="tag pending"><%= t('กำลัง Import') %></span><% } %>
+      </div>
+      <% if (sheet.lastError) { %><div class="serr"><%- icon('alert') %> <%= t(sheet.lastError) %></div><% } %>
+    <% } %>
+  </div>
+  <% if (sheet.enabled && user.role === 'admin') { %>
+  <form method="post" action="/import/sheet"><button class="btn ghost sm"><%= t('ตรวจ Sheet ตอนนี้') %></button></form>
+  <% } %>
+</div>
+<% } %>
 <div class="card table">
 <div class="scroll"><table>
 <thead><tr><th>#</th><th><%= t('เวลา') %></th><th><%= t('ไฟล์') %></th><th><%= t('ผู้ Import') %></th><th><%= t('สถานะ') %></th><th class="num"><%= t('ทั้งหมด') %></th><th class="num"><%= t('เพิ่มใหม่') %></th><th class="num"><%= t('อัปเดต') %></th><th class="num"><%= t('ไม่เปลี่ยน') %></th><th class="num"><%= t('ผิดพลาด') %></th><th></th></tr></thead><tbody>

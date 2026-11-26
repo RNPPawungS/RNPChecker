@@ -9,6 +9,13 @@
   </form>
 </div>
 <div class="flash error" id="upErr" role="alert" hidden></div>
+<dialog id="waitDlg" class="waitdlg"><div class="center">
+  <div class="waitspin"><%- icon('reset', 'spin') %></div>
+  <h3 id="waitTitle"><%= t('กรุณารอสักครู่') %></h3>
+  <p id="waitMsg"></p>
+  <p class="muted sm"><%= t('ไฟล์ของคุณอยู่ในคิวแล้ว ระบบจะบันทึกต่อให้อัตโนมัติเมื่อรายการก่อนหน้าเสร็จ กรุณาอย่าปิดหน้านี้') %></p>
+  <p class="muted sm" id="waitTime"></p>
+</div></dialog>
 <form class="card filters" method="get">
   <input name="q" placeholder="<%= t('ค้นหา Box No. / Waybill No.') %>" value="<%= q.q||'' %>">
   <label><%= t('วันที่|from') %> <input class="dp" name="from" placeholder="dd/mm/yyyy" value="<%= q.from||'' %>" autocomplete="off"></label>
@@ -77,6 +84,29 @@
       label.textContent = p < 100 ? <%- t.js('กำลังส่งไฟล์...') %> + ' ' + p + '%' : <%- t.js('กำลังตรวจสอบและบันทึกข้อมูล...') %>;
     };
     var fail = function (msg) { err.textContent = msg; err.hidden = false; b.disabled = false; label.textContent = idle; f.value = ''; };
+    // Another import is running (the Google Sheet connector or someone else's upload): the server keeps this request waiting
+    // in line. Ask who runs and show the waiting screen until it is our turn.
+    var wd = document.getElementById('waitDlg'), poll = null, sent = false;
+    var WHO = { sheet: <%- t.js('กำลัง Import ข้อมูลจาก Google Sheet') %>, web: <%- t.js('กำลัง Import ไฟล์ของผู้ใช้อื่น') %> };
+    var ask = function () {
+      if (!sent) return;
+      var s = new XMLHttpRequest();
+      s.open('GET', '/import/status');
+      s.onload = function () {
+        var d = null; try { d = JSON.parse(s.responseText); } catch (e) {}
+        // our own upload holds the lock -> it is being saved now, no waiting screen
+        if (d && d.busy && !d.busy.own && poll) {
+          document.getElementById('waitMsg').textContent = WHO[d.busy.who] || '';
+          document.getElementById('waitTime').textContent = <%- t.js('ทำงานมาแล้ว {s} วินาที') %>.replace('{s}', d.busy.seconds);
+          if (!wd.open && wd.showModal) wd.showModal();
+        } else if (wd.open) { wd.close(); }
+      };
+      s.send();
+    };
+    x.upload.onload = function () { sent = true; ask(); poll = setInterval(ask, 2000); };
+    wd.addEventListener('cancel', function (e) { e.preventDefault(); });
+    var stop = function () { clearInterval(poll); poll = null; if (wd.open) wd.close(); };
+    x.onloadend = stop;
     x.onload = function () {
       var d = null; try { d = JSON.parse(x.responseText); } catch (e) {}
       if (d && d.redirect) location.href = d.redirect;

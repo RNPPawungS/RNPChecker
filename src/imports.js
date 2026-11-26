@@ -1,6 +1,9 @@
 // Import (upload) processing with per-row result tracking.
 const ExcelJS = require('exceljs');
 const { readRows } = require('./parse');
+const { saveImport } = require('./importcore');
+const lock = require('./lock');
+const { dmy } = require('./dates');
 
 const STATUS = {
   inserted: 'เพิ่มใหม่',
@@ -10,19 +13,14 @@ const STATUS = {
 };
 const PER_PAGE = 200;
 
-function dmy(v) {
-  const m = String(v ?? '').match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}:\d{2}))?/);
-  return m ? `${m[3]}/${m[2]}/${m[1]}${m[4] ? ' ' + m[4] : ''}` : (v ?? '');
-}
-
-module.exports = function registerImports(app, { db, auth, upload, log, flash }) {
+module.exports = function registerImports(app, { db, auth, upload, log, flash, sheet }) {
   const history = async () => {
     const [rows] = await db.query(`SELECT up.*, u.email FROM uploads up JOIN users u ON u.id=up.user_id ORDER BY up.id DESC LIMIT 50`);
     return rows;
   };
 
   app.get('/upload', auth, async (req, res) => {
-    res.render('upload', { history: await history() });
+    res.render('upload', { history: await history(), sheet: sheet && sheet.status() });
   });
 
   // Import from the data page ("Import ข้อมูล"). The page sends the file with XMLHttpRequest (progress bar) and gets JSON back;
@@ -56,67 +54,29 @@ module.exports = function registerImports(app, { db, auth, upload, log, flash })
       return fail('ไม่พบข้อมูลในไฟล์ (มีแต่หัวคอลัมน์)');
     }
 
-    // duplicates inside the same file
-    const seen = new Map();
-    for (const r of rows) {
-      if (!r.waybill || r.errors.length) continue;
-      if (seen.has(r.waybill)) r.errors.push(`Waybill No. ซ้ำกับแถวที่ ${seen.get(r.waybill)} ในไฟล์เดียวกัน`);
-      else seen.set(r.waybill, r.line);
+    // One import at a time (lock.js). While the Google Sheet connector (sheet.js) or another upload is running, this request waits
+    // in line: the page shows a waiting screen (it asks GET /import/status), and a space is sent every 10 s so the connection
+    // (Nginx proxy_read_timeout, browser) stays open. JSON.parse ignores the leading spaces.
+    let keep = null;
+    if (xhr && lock.state().busy) {
+      res.status(200).set('Content-Type', 'application/json; charset=utf-8');
+      res.write(' ');
+      keep = setInterval(() => res.write(' '), 10000);
     }
-
-    const conn = await db.getConnection();
-    let uploadId;
+    let r;
     try {
-      await conn.beginTransaction();
-      const [up] = await conn.query(`INSERT INTO uploads (user_id, filename, file_size, total_rows, status) VALUES (?,?,?,?, 'processing')`,
-        [req.user.id, filename, req.file.size, rows.length]);
-      uploadId = up.insertId;
+      r = await lock.withLock('web', req.user.email, () => saveImport(db, { rows, userId: req.user.id, filename, size: req.file.size }));
+    } finally { clearInterval(keep); }
+    if (r.failed) log(req, 'import', { file: filename, failed: 1, msg: r.failed.slice(0, 200) }, `/upload/${r.uploadId}`);
+    else log(req, 'import', { file: filename, ...r.counts }, `/upload/${r.uploadId}`);
+    if (keep) res.end(JSON.stringify({ redirect: `/upload/${r.uploadId}` }));
+    else go(`/upload/${r.uploadId}`);
+  });
 
-      const good = rows.filter((r) => !r.errors.length);
-      for (let i = 0; i < good.length; i += 500) {
-        const chunk = good.slice(i, i + 500);
-        const [existing] = await conn.query('SELECT waybill_no, box_no, operation_date FROM packings WHERE waybill_no IN (?)', [chunk.map((x) => x.waybill)]);
-        const old = new Map(existing.map((e) => [e.waybill_no, e]));
-        for (const r of chunk) {
-          const o = old.get(r.waybill);
-          if (!o) { r.status = 'inserted'; continue; }
-          r.oldBox = o.box_no; r.oldDate = o.operation_date;
-          if (o.box_no === r.box && o.operation_date === r.date) { r.status = 'unchanged'; r.message = 'ข้อมูลตรงกับที่มีอยู่แล้ว'; continue; }
-          r.status = 'updated';
-          const ch = [];
-          if (o.box_no !== r.box) ch.push(`Box No. ${o.box_no} → ${r.box}`);
-          if (o.operation_date !== r.date) ch.push(`Operation Date ${dmy(o.operation_date)} → ${dmy(r.date)}`);
-          r.message = ch.join(', ');
-        }
-        const changed = chunk.filter((r) => r.status !== 'unchanged');
-        if (changed.length) {
-          await conn.query(`INSERT INTO packings (box_no, waybill_no, operation_date, upload_id, created_by) VALUES ?
-            ON DUPLICATE KEY UPDATE box_no=VALUES(box_no), operation_date=VALUES(operation_date), upload_id=VALUES(upload_id), updated_by=${Number(req.user.id)}`,
-            [changed.map((x) => [x.box, x.waybill, x.date, uploadId, req.user.id])]);
-        }
-      }
-      for (const r of rows) if (r.errors.length) { r.status = 'error'; r.message = r.errors.join(', '); }
-
-      for (let i = 0; i < rows.length; i += 1000) {
-        await conn.query(`INSERT INTO upload_rows (upload_id, line_no, box_no, waybill_no, operation_date, raw_date, status, message, old_box_no, old_operation_date) VALUES ?`,
-          [rows.slice(i, i + 1000).map((r) => [uploadId, r.line, r.box.slice(0, 64), r.waybill.slice(0, 64), r.date, (r.raw || '').slice(0, 64),
-            r.status, r.message ? r.message.slice(0, 500) : null, r.oldBox ?? null, r.oldDate ?? null])]);
-      }
-      const n = (s) => rows.filter((r) => r.status === s).length;
-      await conn.query(`UPDATE uploads SET inserted_rows=?, updated_rows=?, unchanged_rows=?, error_rows=?, status='done', duration_ms=? WHERE id=?`,
-        [n('inserted'), n('updated'), n('unchanged'), n('error'), Date.now() - started, uploadId]);
-      await conn.commit();
-      log(req, 'import', { file: filename, n: rows.length, inserted: n('inserted'), updated: n('updated'), unchanged: n('unchanged'), error: n('error') }, `/upload/${uploadId}`);
-    } catch (e) {
-      await conn.rollback();
-      conn.release();
-      const [r] = await db.query(`INSERT INTO uploads (user_id, filename, file_size, total_rows, status, message, duration_ms) VALUES (?,?,?,?,?,?,?)`,
-        [req.user.id, filename, req.file.size, rows.length, 'failed', ('บันทึกไม่สำเร็จ ไม่มีข้อมูลใดถูกบันทึก: ' + e.message).slice(0, 500), Date.now() - started]);
-      log(req, 'import', { file: filename, failed: 1, msg: ('บันทึกไม่สำเร็จ ไม่มีข้อมูลใดถูกบันทึก: ' + e.message).slice(0, 200) }, `/upload/${r.insertId}`);
-      return go(`/upload/${r.insertId}`);
-    }
-    conn.release();
-    go(`/upload/${uploadId}`);
+  // Is an import running? The data page asks this while its upload waits, to show who it waits for.
+  app.get('/import/status', auth, (req, res) => {
+    const s = lock.state();
+    res.json({ busy: s.busy && { who: s.busy.who, seconds: s.busy.seconds, own: s.busy.who === 'web' && s.busy.email === req.user.email }, waiting: s.waiting });
   });
 
   const filterSql = (q) => {

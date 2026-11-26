@@ -39,6 +39,27 @@ function cellText(v) {
   return String(v).trim();
 }
 
+/**
+ * One data row of an uploaded file or of the Google Sheet (sheet.js): numbers cleaned, date checked. null for an empty row.
+ * Numbers scanned into a sheet can carry *, ^, Codabar letters, control characters... (barcode.js)
+ */
+function buildRow(line, boxText, waybillText, rawDate) {
+  const box = barcode.strip(boxText);
+  const waybill = barcode.waybill(waybillText, { layout: false });
+  if (!box && !waybill && (rawDate == null || rawDate === '')) return null;
+  const date = toDate(rawDate);
+  const errors = [];
+  if (!box) errors.push('ไม่มี Box No.');
+  if (!waybill) errors.push('ไม่มี Waybill No.');
+  // a real date (Excel / Google Sheets date cell) is kept as yyyy-mm-dd, text as it was typed
+  const raw = rawDate instanceof Date || (typeof rawDate === 'number' && date) ? (date || '') : cellText(rawDate).slice(0, 64);
+  if (rawDate == null || rawDate === '') errors.push('ไม่มี Operation Date');
+  else if (!date) errors.push(`Operation Date "${raw}" ไม่ถูกต้อง (ต้องเป็น dd/mm/yyyy)`);
+  if (box.length > 64) errors.push('Box No. ยาวเกิน 64 ตัวอักษร');
+  if (waybill.length > 64) errors.push('Waybill No. ยาวเกิน 64 ตัวอักษร');
+  return { line, box, waybill, date, raw, errors };
+}
+
 async function readRows(buffer, filename) {
   const wb = new ExcelJS.Workbook();
   if (/\.csv$/i.test(filename)) {
@@ -60,21 +81,8 @@ async function readRows(buffer, filename) {
   const rows = [];
   ws.eachRow((row, idx) => {
     if (idx === 1) return;
-    // numbers scanned into the sheet can carry *, ^, Codabar letters, control characters... (barcode.js)
-    const box = barcode.strip(cellText(row.getCell(colMap.box).value));
-    const waybill = barcode.waybill(cellText(row.getCell(colMap.waybill).value), { layout: false });
-    const rawDate = row.getCell(colMap.date).value;
-    if (!box && !waybill && (rawDate == null || rawDate === '')) return;
-    const date = toDate(rawDate);
-    const errors = [];
-    if (!box) errors.push('ไม่มี Box No.');
-    if (!waybill) errors.push('ไม่มี Waybill No.');
-    const raw = rawDate instanceof Date ? (date || '') : cellText(rawDate).slice(0, 64);
-    if (rawDate == null || rawDate === '') errors.push('ไม่มี Operation Date');
-    else if (!date) errors.push(`Operation Date "${raw}" ไม่ถูกต้อง (ต้องเป็น dd/mm/yyyy)`);
-    if (box.length > 64) errors.push('Box No. ยาวเกิน 64 ตัวอักษร');
-    if (waybill.length > 64) errors.push('Waybill No. ยาวเกิน 64 ตัวอักษร');
-    rows.push({ line: idx, box, waybill, date, raw, errors });
+    const r = buildRow(idx, cellText(row.getCell(colMap.box).value), cellText(row.getCell(colMap.waybill).value), row.getCell(colMap.date).value);
+    if (r) rows.push(r);
   });
   return rows;
 }
@@ -104,4 +112,4 @@ async function buildTemplate(t = (s) => s.split('|')[0]) {
   return wb.xlsx.writeBuffer();
 }
 
-module.exports = { readRows, buildTemplate, toDate, HEADERS };
+module.exports = { readRows, buildRow, buildTemplate, toDate, cellText, HEADERS };

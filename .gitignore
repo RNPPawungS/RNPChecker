@@ -11,3 +11,5 @@ uploads/
 *.key
 *.crt
 .DS_Store
+# Google service account key (Google Sheet connector)
+*service-account*.json
