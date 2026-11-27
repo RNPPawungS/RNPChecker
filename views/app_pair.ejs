@@ -6,6 +6,7 @@
     <p><%- t.h('เปิดแอป <b>RNP Checker</b> บนเครื่อง handheld แล้ว<b>ยิงบาร์โค้ด QR นี้</b><br>แอปจะเข้าสู่ระบบเป็น <b>{email}</b>', { email: user.email }) %></p>
     <div class="qr"><%- qr %></div>
     <p class="muted sm"><%= t('QR ใช้ได้') %> <span id="left"><%= ttlMin %>:00</span> <%= t('นาที') %> · <a href="/app/pair"><%= t('สร้าง QR ใหม่') %></a></p>
+    <div id="pairst" class="pairst wait" aria-live="polite"><span class="dot"></span><span id="pairtx"><%= t('รอเครื่อง handheld สแกน QR นี้...') %></span></div>
     <details class="sm"><summary><%= t('แสดงรหัส (กรณีพิมพ์เอง)') %></summary><p class="mono" style="word-break:break-all"><%= code %></p></details>
   </div>
   <div class="card center">
@@ -27,8 +28,29 @@
   var t = setInterval(function () {
     var s = Math.max(0, Math.round((end - Date.now()) / 1000));
     el.textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
-    if (!s) { clearInterval(t); location.reload(); }
+    if (!s && !done) { clearInterval(t); location.reload(); }
   }, 1000);
+
+  // status of the device pairing with the QR above only
+  var code = <%- JSON.stringify(code) %>, box = document.getElementById('pairst'), tx = document.getElementById('pairtx'), done = false;
+  var L = <%- JSON.stringify({ ok: t('เชื่อมต่อแล้ว'), exp: t('QR หมดอายุ กรุณาสร้าง QR ใหม่') }) %>;
+  function show(cls, html) { box.className = 'pairst ' + cls; tx.innerHTML = html; }
+  function esc(v) { return String(v || '').replace(/[&<>"']/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); }
+  function poll() {
+    fetch('/app/pair/status?code=' + encodeURIComponent(code), { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.state === 'paired') {
+          done = true; clearInterval(t);
+          var at = new Date(d.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          return show('ok', '<b>' + esc(L.ok) + '</b> · ' + esc(d.device) + (d.ip ? ' · ' + esc(d.ip) : '') + ' · ' + esc(at));
+        }
+        if (d.state === 'expired') { done = true; return show('err', esc(L.exp)); }
+        setTimeout(poll, 2000);
+      })
+      .catch(function () { setTimeout(poll, 5000); });
+  }
+  poll();
 })();
 </script>
 <%- include('_foot') %>

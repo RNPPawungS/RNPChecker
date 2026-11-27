@@ -46,6 +46,19 @@ function bearer(db) {
   };
 }
 
+// Which device used which pairing QR. In memory only (lost on restart, which is fine: a QR lives 10 minutes).
+// The pairing page asks about its own code only, so it shows just the device that scanned the QR on screen.
+const paired = new Map(); // pair code -> { uid, at, device, ip }
+function rememberPair(code, uid, req) {
+  const t = Date.now();
+  for (const [k, v] of paired) if (t - v.at > PAIR_TTL * 1000) paired.delete(k);
+  const ua = String(req.get('user-agent') || '');
+  const app = /RNPChecker-Android\/([\w.-]+)/.exec(ua);
+  const model = String(req.body.device || '').replace(/[^\w .()+-]/g, '').slice(0, 60).trim();
+  const device = [model, app ? `RNP Checker v${app[1]}` : ua.slice(0, 60)].filter(Boolean).join(' · ');
+  paired.set(code, { uid, at: t, device, ip: req.ip });
+}
+
 function routes(app, { db, auth, log }) {
   const json = express.json({ limit: '2kb' });
 
@@ -56,6 +69,17 @@ function routes(app, { db, auth, log }) {
     const dl = `${APP_URL}/app/download`;
     const dlQr = await QRCode.toString(dl, { type: 'svg', margin: 1 });
     res.render('app_pair', { qr, code, dl, dlQr, hasApk: fs.existsSync(APK), ttlMin: PAIR_TTL / 60 });
+  });
+
+  // status of the device that scanned the QR shown on /app/pair (polled by that page)
+  app.get('/app/pair/status', auth, (req, res) => {
+    const code = String(req.query.code || '').trim().toLowerCase();
+    const p = verify(code, 'p');
+    res.set('Cache-Control', 'no-store');
+    if (!p || p.uid !== req.user.id) return res.json({ state: 'expired' });
+    const d = paired.get(code);
+    if (!d) return res.json({ state: 'waiting' });
+    res.json({ state: 'paired', device: d.device, ip: d.ip, at: new Date(d.at).toISOString() });
   });
 
   // login from the browser on the handheld itself: after Google login, hand the code back to the app
@@ -77,6 +101,7 @@ function routes(app, { db, auth, log }) {
     if (!p) return res.status(400).json({ error: 'QR หมดอายุหรือไม่ถูกต้อง กรุณาเปิดหน้า "เชื่อมแอป Android" ใหม่', code: 'pair' });
     const [[u]] = await db.query('SELECT id, email, name, role, status FROM users WHERE id=? AND deleted_at IS NULL', [p.uid]);
     if (!u || u.status !== 'active') return res.status(403).json({ error: 'บัญชีนี้ยังใช้งานไม่ได้', code: 'status' });
+    rememberPair(String(req.body.code).trim().toLowerCase(), u.id, req);
     if (log) log(req, 'app_login', null, null, u);
     res.json({ token: sign('a', u.id, APP_TTL), email: u.email, name: u.name, role: u.role });
   });

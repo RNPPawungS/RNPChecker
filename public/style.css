@@ -273,6 +273,11 @@ input.scan:focus{background:#fffafa}
 
 /* ---------- app pairing ---------- */
 .qr{background:#fff;border:1px solid var(--line);border-radius:16px;padding:12px;display:inline-block;margin:8px auto}
+.pairst{display:inline-flex;align-items:center;gap:8px;margin:4px auto 10px;padding:8px 14px;border-radius:999px;font-size:14px;max-width:100%;text-align:left}
+.pairst .dot{width:9px;height:9px;border-radius:50%;background:currentColor;flex:none}
+.pairst.wait{background:#f1f5f9;color:#475569}.pairst.wait .dot{animation:pairblink 1.2s infinite}
+.pairst.ok{background:var(--ok-50);color:var(--ok)}.pairst.err{background:var(--err-50);color:var(--err)}
+@keyframes pairblink{50%{opacity:.25}}
 .qr svg{width:min(240px,64vw);height:auto;display:block}
 details summary{cursor:pointer}
 
